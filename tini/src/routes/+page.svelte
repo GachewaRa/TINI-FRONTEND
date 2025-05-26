@@ -62,8 +62,8 @@
 <div class="space-y-8">
   <!-- Welcome Section -->
   <div class="text-center">
-    <h1 class="text-4xl font-bold text-yellow-600 mb-2">Welcome to Your PKMS</h1>
-    <p class="text-xl text-gray-400">Personal Knowledge Management System</p>
+    <h1 class="text-4xl font-bold text-yellow-600 mb-2">Welcome to Your Aktaba Dashboard</h1>
+    <!-- <p class="text-xl text-gray-400">Personal Knowledge Management System</p> -->
   </div>
   
   <!-- Stats Grid -->

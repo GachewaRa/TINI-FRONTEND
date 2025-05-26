@@ -60,10 +60,9 @@
 
 <aside class="w-64 bg-gray-800 border-r border-gray-700 flex flex-col">
   <!-- Logo -->
-  <div class="p-6 border-b border-gray-700">
-    <h1 class="text-2xl font-bold text-yellow-600">PKMS</h1>
-    <p class="text-sm text-gray-400 mt-1">Knowledge Management</p>
-  </div>
+<div class="p-6 border-b border-gray-700">
+  <img src="AKTABALOGO.png" alt="AKTABA Logo" class="h-auto w-full max-w-[150px] mx-auto block">
+</div>
   
   <!-- Navigation -->
   <nav class="flex-1 p-4">
