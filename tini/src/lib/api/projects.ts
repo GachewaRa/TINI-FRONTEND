@@ -1,0 +1,58 @@
+// src/lib/api/projects.ts
+import { apiClient, withLoading } from './client';
+import type {
+  Project,
+  ProjectCreate,
+  ProjectUpdate,
+  ProjectResponse,
+  ProjectsQueryParams
+} from '../types/projects'; // Adjust path if needed
+
+export class ProjectsAPI {
+  private static readonly BASE_PATH = '/api/v1/projects';
+
+  /**
+   * Get all projects with optional filtering
+   */
+  static async getProjects(params?: ProjectsQueryParams): Promise<ProjectResponse[]> {
+    return withLoading(
+      apiClient.get<ProjectResponse[]>(this.BASE_PATH, params)
+    );
+  }
+
+  /**
+   * Get a specific project by ID
+   */
+  static async getProject(projectId: string): Promise<ProjectResponse> {
+    return withLoading(
+      apiClient.get<ProjectResponse>(`${this.BASE_PATH}/${projectId}`)
+    );
+  }
+
+  /**
+   * Create a new project
+   */
+  static async createProject(projectData: ProjectCreate): Promise<ProjectResponse> {
+    return withLoading(
+      apiClient.post<ProjectResponse>(this.BASE_PATH, projectData)
+    );
+  }
+
+  /**
+   * Update a project
+   */
+  static async updateProject(projectId: string, projectData: ProjectUpdate): Promise<ProjectResponse> {
+    return withLoading(
+      apiClient.put<ProjectResponse>(`${this.BASE_PATH}/${projectId}`, projectData)
+    );
+  }
+
+  /**
+   * Delete a project
+   */
+  static async deleteProject(projectId: string): Promise<void> {
+    return withLoading(
+      apiClient.delete<void>(`${this.BASE_PATH}/${projectId}`)
+    );
+  }
+}
