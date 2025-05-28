@@ -1,35 +1,43 @@
 <!-- src/routes/tags/+page.svelte -->
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Plus, Tag as TagIcon, Move } from 'lucide-svelte';
-  import { mockTags } from '$lib/stores';
-  import type { Tag } from '$lib/types';
+  import { Plus, Tag as TagIcon, Move, AlertCircle, RefreshCw } from 'lucide-svelte';
+  import { tagsStore, tagHierarchy, tagsLoading, tagsError, getTagDescendants, getTagDepth } from '$lib/stores/tags';
+  import type { Tag, TagNode } from '$lib/types/tags';
   
-  let tags: Tag[] = [];
   let draggedTag: Tag | null = null;
   let dragOverTag: Tag | null = null;
   
-  onMount(() => {
-    tags = [...mockTags];
+  // Reactive values from stores
+  $: hierarchy = $tagHierarchy;
+  $: isLoading = $tagsLoading;
+  $: error = $tagsError;
+  $: totalTags = hierarchy.reduce((count, root) => count + 1 + countDescendants(root), 0);
+  
+  onMount(async () => {
+    try {
+      await tagsStore.load();
+    } catch (err) {
+      console.error('Failed to load tags:', err);
+    }
   });
   
-  // Build hierarchy for visual representation
-  $: tagHierarchy = buildHierarchy(tags);
+  function countDescendants(tag: TagNode): number {
+    return tag.children.reduce((count, child) => count + 1 + countDescendants(child), 0);
+  }
   
-  function buildHierarchy(tagList: Tag[]) {
-    const tagMap = new Map(tagList.map(tag => [tag.id, { ...tag, children: [] }]));
-    const roots: any[] = [];
+  function flattenHierarchy(nodes: TagNode[]): Tag[] {
+    const result: Tag[] = [];
     
-    tagList.forEach(tag => {
-      const tagNode = tagMap.get(tag.id);
-      if (tag.parent_id && tagMap.has(tag.parent_id)) {
-        tagMap.get(tag.parent_id)!.children.push(tagNode);
-      } else {
-        roots.push(tagNode);
-      }
-    });
+    function traverse(nodeList: TagNode[]) {
+      nodeList.forEach(node => {
+        result.push(node);
+        traverse(node.children);
+      });
+    }
     
-    return roots;
+    traverse(nodes);
+    return result;
   }
   
   function handleDragStart(event: DragEvent, tag: Tag) {
@@ -54,39 +62,32 @@
     dragOverTag = null;
   }
   
-  function handleDrop(event: DragEvent, targetTag: Tag) {
+  async function handleDrop(event: DragEvent, targetTag: Tag) {
     event.preventDefault();
     
     if (draggedTag && draggedTag.id !== targetTag.id && !isDescendant(draggedTag, targetTag)) {
-      // Update the dragged tag's parent
-      const updatedTags = tags.map(tag => 
-        tag.id === draggedTag!.id 
-          ? { ...tag, parent_id: targetTag.id }
-          : tag
-      );
-      tags = updatedTags;
-      
-      // Here you would typically make an API call to update the backend
-      console.log(`Moved tag "${draggedTag.name}" under "${targetTag.name}"`);
+      try {
+        await tagsStore.moveTag(draggedTag.id, targetTag.id);
+        console.log(`Moved tag "${draggedTag.name}" under "${targetTag.name}"`);
+      } catch (err) {
+        console.error('Failed to move tag:', err);
+      }
     }
     
     draggedTag = null;
     dragOverTag = null;
   }
   
-  function handleDropToRoot(event: DragEvent) {
+  async function handleDropToRoot(event: DragEvent) {
     event.preventDefault();
     
     if (draggedTag) {
-      // Update the dragged tag to be a root tag
-      const updatedTags = tags.map(tag => 
-        tag.id === draggedTag!.id 
-          ? { ...tag, parent_id: undefined }
-          : tag
-      );
-      tags = updatedTags;
-      
-      console.log(`Moved tag "${draggedTag.name}" to root level`);
+      try {
+        await tagsStore.moveTag(draggedTag.id, null);
+        console.log(`Moved tag "${draggedTag.name}" to root level`);
+      } catch (err) {
+        console.error('Failed to move tag to root:', err);
+      }
     }
     
     draggedTag = null;
@@ -94,33 +95,21 @@
   }
   
   function isDescendant(ancestor: Tag, tag: Tag): boolean {
-    const descendants = getDescendants(ancestor);
+    const allTags = flattenHierarchy(hierarchy);
+    const descendants = getTagDescendants(allTags, ancestor.id);
     return descendants.some(desc => desc.id === tag.id);
   }
   
-  function getDescendants(tag: Tag): Tag[] {
-    const children = tags.filter(t => t.parent_id === tag.id);
-    const descendants = [...children];
-    
-    children.forEach(child => {
-      descendants.push(...getDescendants(child));
-    });
-    
-    return descendants;
+  async function handleRefresh() {
+    try {
+      await tagsStore.refresh();
+    } catch (err) {
+      console.error('Failed to refresh tags:', err);
+    }
   }
   
-  function getTagDepth(tag: Tag): number {
-    let depth = 0;
-    let current = tag;
-    
-    while (current.parent_id) {
-      depth++;
-      const parent = tags.find(t => t.id === current.parent_id);
-      if (!parent) break;
-      current = parent;
-    }
-    
-    return depth;
+  function handleClearError() {
+    tagsStore.clearError();
   }
 </script>
 
@@ -133,85 +122,242 @@
   <div class="flex items-center justify-between">
     <div>
       <h1 class="text-3xl font-bold text-gray-200">Tags</h1>
-      <p class="text-gray-400 mt-1">{tags.length} tags total</p>
+      <p class="text-gray-400 mt-1">{totalTags} tags total</p>
     </div>
     
-    <a href="/tags/new" class="btn-primary flex items-center space-x-2">
-      <Plus class="w-4 h-4" />
-      <span>New Tag</span>
-    </a>
+    <div class="flex items-center space-x-3">
+      <button 
+        on:click={handleRefresh}
+        class="btn-secondary flex items-center space-x-2"
+        disabled={isLoading}
+      >
+        <RefreshCw class="w-4 h-4 {isLoading ? 'animate-spin' : ''}" />
+        <span>Refresh</span>
+      </button>
+      
+      <a href="/tags/new" class="btn-primary flex items-center space-x-2">
+        <Plus class="w-4 h-4" />
+        <span>New Tag</span>
+      </a>
+    </div>
   </div>
   
-  <!-- Drop zone for root level -->
-  <div 
-    class="tag-workspace"
-    on:dragover|preventDefault
-    on:drop={handleDropToRoot}
-  >
-    <div class="workspace-background">
-      <div class="workspace-grid"></div>
+  <!-- Error Alert -->
+  {#if error}
+    <div class="bg-red-900/20 border border-red-700 rounded-lg p-4 flex items-start space-x-3">
+      <AlertCircle class="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
+      <div class="flex-1">
+        <h3 class="text-red-400 font-medium">Error loading tags</h3>
+        <p class="text-red-300 mt-1">{error}</p>
+      </div>
+      <button 
+        on:click={handleClearError}
+        class="text-red-400 hover:text-red-300"
+      >
+        ×
+      </button>
     </div>
-    
-    <!-- Tags Display -->
-    <div class="tags-container">
-      {#each tagHierarchy as rootTag (rootTag.id)}
-        <div class="tag-tree">
-          {#each [rootTag, ...getDescendants(rootTag)] as tag (tag.id)}
-            <div 
-              class="tag-item"
-              class:dragging={draggedTag?.id === tag.id}
-              class:drag-over={dragOverTag?.id === tag.id}
-              style="--depth: {getTagDepth(tag)}; --tag-color: {tag.color || '#6b7280'}"
-              draggable="true"
-              role="button"
-              tabindex="0"
-              on:dragstart={(e) => handleDragStart(e, tag)}
-              on:dragover={(e) => handleDragOver(e, tag)}
-              on:dragleave={handleDragLeave}
-              on:drop={(e) => handleDrop(e, tag)}
-              on:click={() => window.location.href = `/tags/${tag.id}`}
-              on:keydown={(e) => e.key === 'Enter' && (window.location.href = `/tags/${tag.id}`)}
-            >
-              <div class="tag-content">
-                <div class="tag-header">
-                  <div class="tag-color" style="background-color: {tag.color || '#6b7280'}"></div>
-                  <TagIcon class="w-4 h-4 text-gray-400" />
-                  <Move class="w-3 h-3 text-gray-500 drag-handle" />
-                </div>
-                
-                <div class="tag-info">
-                  <h3 class="tag-name">{tag.name}</h3>
-                  {#if tag.description}
-                    <p class="tag-description">{tag.description}</p>
-                  {/if}
-                  
-                  <div class="tag-meta">
-                    {#if tag.children?.length > 0}
-                      <span class="children-count">{tag.children.length} child{tag.children.length !== 1 ? 'ren' : ''}</span>
-                    {/if}
+  {/if}
+  
+  <!-- Loading State -->
+  {#if isLoading && hierarchy.length === 0}
+    <div class="flex items-center justify-center py-12">
+      <div class="flex items-center space-x-3 text-gray-400">
+        <RefreshCw class="w-5 h-5 animate-spin" />
+        <span>Loading tags...</span>
+      </div>
+    </div>
+  {:else}
+    <!-- Drop zone for root level -->
+    <div 
+      class="tag-workspace"
+      on:dragover|preventDefault
+      on:drop={handleDropToRoot}
+    >
+      <div class="workspace-background">
+        <div class="workspace-grid"></div>
+      </div>
+      
+      <!-- Tags Display -->
+      <div class="tags-container">
+        {#if hierarchy.length === 0}
+          <div class="text-center py-12">
+            <TagIcon class="w-12 h-12 text-gray-600 mx-auto mb-4" />
+            <h3 class="text-lg font-medium text-gray-400 mb-2">No tags yet</h3>
+            <p class="text-gray-500 mb-4">Create your first tag to get started</p>
+            <a href="/tags/new" class="btn-primary inline-flex items-center space-x-2">
+              <Plus class="w-4 h-4" />
+              <span>Create Tag</span>
+            </a>
+          </div>
+        {:else}
+          {#each hierarchy as rootTag (rootTag.id)}
+            <div class="tag-tree">
+              {#each [rootTag, ...getTagDescendants(flattenHierarchy(hierarchy), rootTag.id)] as tag (tag.id)}
+                <div 
+                  class="tag-item"
+                  class:dragging={draggedTag?.id === tag.id}
+                  class:drag-over={dragOverTag?.id === tag.id}
+                  style="--depth: {getTagDepth(flattenHierarchy(hierarchy), tag)}; --tag-color: {tag.color || '#6b7280'}"
+                  draggable="true"
+                  role="button"
+                  tabindex="0"
+                  on:dragstart={(e) => handleDragStart(e, tag)}
+                  on:dragover={(e) => handleDragOver(e, tag)}
+                  on:dragleave={handleDragLeave}
+                  on:drop={(e) => handleDrop(e, tag)}
+                  on:click={() => window.location.href = `/tags/${tag.id}`}
+                  on:keydown={(e) => e.key === 'Enter' && (window.location.href = `/tags/${tag.id}`)}
+                >
+                  <div class="tag-content">
+                    <div class="tag-header">
+                      <div class="tag-color" style="background-color: {tag.color || '#6b7280'}"></div>
+                      <TagIcon class="w-4 h-4 text-gray-400" />
+                      <Move class="w-3 h-3 text-gray-500 drag-handle" />
+                    </div>
+                    
+                    <div class="tag-info">
+                      <h3 class="tag-name">{tag.name}</h3>
+                      {#if tag.description}
+                        <p class="tag-description">{tag.description}</p>
+                      {/if}
+                      
+                      <div class="tag-meta">
+                        {#if tag.children?.length > 0}
+                          <span class="children-count">{tag.children.length} child{tag.children.length !== 1 ? 'ren' : ''}</span>
+                        {/if}
+                      </div>
+                    </div>
                   </div>
+                  
+                  <!-- Connection line for hierarchy -->
+                  {#if tag.parent_id}
+                    <div class="hierarchy-line"></div>
+                  {/if}
                 </div>
-              </div>
-              
-              <!-- Connection line for hierarchy -->
-              {#if tag.parent_id}
-                <div class="hierarchy-line"></div>
-              {/if}
+              {/each}
             </div>
           {/each}
+        {/if}
+      </div>
+      
+      <!-- Help text -->
+      {#if hierarchy.length > 0}
+        <div class="help-text">
+          <p>Drag tags onto each other to create parent-child relationships</p>
+          <p>Drop tags in empty space to make them root-level tags</p>
         </div>
-      {/each}
+      {/if}
     </div>
-    
-    <!-- Help text -->
-    <div class="help-text">
-      <p>Drag tags onto each other to create parent-child relationships</p>
-      <p>Drop tags in empty space to make them root-level tags</p>
-    </div>
-  </div>
+  {/if}
 </div>
 
+
+
+  
+
+
 <style>
+
+  /* .tag-workspace {
+    @apply relative min-h-96 bg-gray-900/50 rounded-lg border border-gray-700 overflow-hidden;
+  }
+  
+  .workspace-background {
+    @apply absolute inset-0 opacity-30;
+  }
+  
+  .workspace-grid {
+    @apply w-full h-full;
+    background-image: 
+      linear-gradient(rgba(107, 114, 128, 0.1) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(107, 114, 128, 0.1) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+  
+  .tags-container {
+    @apply relative z-10 p-6 space-y-4;
+  }
+  
+  .tag-tree {
+    @apply space-y-2;
+  }
+  
+  .tag-item {
+    @apply relative p-4 bg-gray-800/60 backdrop-blur-sm border border-gray-700 rounded-lg cursor-pointer transition-all duration-200 hover:bg-gray-800/80 hover:border-gray-600;
+    margin-left: calc(var(--depth) * 2rem);
+  }
+  
+  .tag-item.dragging {
+    @apply opacity-60 scale-95;
+  }
+  
+  .tag-item.drag-over {
+    @apply border-blue-500 bg-blue-900/20;
+  }
+  
+  .tag-content {
+    @apply flex items-start space-x-3;
+  }
+  
+  .tag-header {
+    @apply flex items-center space-x-2 flex-shrink-0;
+  }
+  
+  .tag-color {
+    @apply w-3 h-3 rounded-full;
+  }
+  
+  .drag-handle {
+    @apply opacity-0 group-hover:opacity-100 transition-opacity cursor-grab;
+  }
+  
+  .tag-item:hover .drag-handle {
+    @apply opacity-100;
+  }
+  
+  .tag-info {
+    @apply flex-1 min-w-0;
+  }
+  
+  .tag-name {
+    @apply text-gray-200 font-medium;
+  }
+  
+  .tag-description {
+    @apply text-gray-400 text-sm mt-1 line-clamp-2;
+  }
+  
+  .tag-meta {
+    @apply flex items-center space-x-4 mt-2;
+  }
+  
+  .children-count {
+    @apply text-xs text-gray-500 bg-gray-700 px-2 py-1 rounded;
+  }
+  
+  .hierarchy-line {
+    @apply absolute left-0 top-0 w-0.5 h-full bg-gradient-to-b from-transparent via-gray-600 to-transparent;
+    left: calc(var(--depth) * 2rem - 1rem);
+  }
+  
+  .help-text {
+    @apply absolute bottom-4 left-4 text-xs text-gray-500 space-y-1;
+  }
+  
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-700 hover:bg-gray-600 text-gray-200 px-4 py-2 rounded-lg transition-colors;
+  }
+  
+  .btn-secondary:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  } */
+
+
   .tag-workspace {
     position: relative;
     min-height: 600px;
