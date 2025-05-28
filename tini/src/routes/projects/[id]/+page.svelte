@@ -5,7 +5,7 @@
   import { Save, ArrowLeft, Folder, Tag as TagIcon, FileText } from 'lucide-svelte';
   import TinyMCEEditor from '$lib/components/TinyMCEEditor.svelte';
   import TagSelector from '$lib/components/TagSelector.svelte';
-  import NoteCard from '$lib/components/NoteCard.svelte'; // Assuming you have this component
+  import NoteCard from '$lib/components/NoteCard.svelte';
   import { projects, projectFolders, tags as availableTagsStore, notes as allNotesStore } from '$lib/stores';
   import type { Project, ProjectFolder, Tag, Note } from '$lib/types';
   import { get } from 'svelte/store';

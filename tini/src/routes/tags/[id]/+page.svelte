@@ -1,4 +1,3 @@
-<!-- src/routes/tags/[id]/+page.svelte -->
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
@@ -14,12 +13,13 @@
     Users,
     Calendar,
     FileText,
-    Folder
+    Folder,
+    AlertCircle,
+    RefreshCw
   } from 'lucide-svelte';
-  import { mockTags } from '$lib/stores';
-  import type { Tag } from '$lib/types';
+  import { tagsStore, tags, tagsLoading, tagsError } from '$lib/stores/tags';
+  import type { Tag } from '$lib/types/tags';
   
-  let tags: Tag[] = [];
   let tag: Tag | null = null;
   let isEditing = false;
   let showDeleteConfirm = false;
@@ -42,27 +42,34 @@
   
   $: tagId = $page.params.id;
   
-  onMount(() => {
-    tags = [...mockTags];
-    tag = tags.find(t => t.id === tagId) || null;
-    
-    if (!tag) {
-      goto('/tags');
-      return;
+  onMount(async () => {
+    try {
+        await tagsStore.load();
+    } catch (err) {
+        console.error('Failed to load tags:', err);
     }
-    
-    // Initialize edit form
+  });
+
+  // Update reactive statements with safe defaults
+  $: tagList = $tags || [];
+  $: tag = tagList.find(t => t.id === tagId) || null;
+  $: isLoading = $tagsLoading;
+  $: error = $tagsError;
+  
+  // Initialize edit form when tag is found
+  $: if (tag && !isEditing) {
     editName = tag.name;
     editDescription = tag.description || '';
     editColor = tag.color || '#3b82f6';
     editParentId = tag.parent_id || '';
-  });
+  }
   
-  // Get tag relationships
-  $: children = tag ? tags.filter(t => t.parent_id === tag.id) : [];
-  $: parent = tag?.parent_id ? tags.find(t => t.id === tag.parent_id) : null;
-  $: siblings = tag && parent ? tags.filter(t => t.parent_id === parent.id && t.id !== tag.id) : [];
-  $: availableParentTags = tags.filter(t => t.id !== tag?.id && !isDescendant(tag, t));
+  // Get tag relationships with safe defaults
+  $: children = tag ? tagList.filter(t => t.parent_id === tag.id) : [];
+  $: parent = tag?.parent_id ? tagList.find(t => t.id === tag.parent_id) : null;
+  $: siblings = tag && parent ? tagList.filter(t => t.parent_id === parent.id && t.id !== tag.id) : 
+              tag && !tag.parent_id ? tagList.filter(t => !t.parent_id && t.id !== tag.id) : [];
+  $: availableParentTags = tagList.filter(t => t.id !== tag?.id && !isDescendant(tag, t));
   
   function isDescendant(ancestor: Tag | null, potential: Tag): boolean {
     if (!ancestor) return false;
@@ -71,7 +78,7 @@
   }
   
   function getDescendants(tag: Tag): Tag[] {
-    const children = tags.filter(t => t.parent_id === tag.id);
+    const children = tagList.filter(t => t.parent_id === tag.id);
     const descendants = [...children];
     
     children.forEach(child => {
@@ -105,7 +112,7 @@
       errors.name = 'Tag name is required';
     } else if (editName.length > 100) {
       errors.name = 'Tag name must be less than 100 characters';
-    } else if (tags.some(t => t.id !== tag?.id && t.name.toLowerCase() === editName.toLowerCase())) {
+    } else if ($tags.some(t => t.id !== tag?.id && t.name.toLowerCase() === editName.toLowerCase())) {
       errors.name = 'A tag with this name already exists';
     }
     
@@ -123,37 +130,35 @@
   async function saveChanges() {
     if (!tag || !validateForm()) return;
     
-    const updatedTag: Tag = {
-      ...tag,
-      name: editName.trim(),
-      description: editDescription.trim() || undefined,
-      color: editColor,
-      parent_id: editParentId || undefined,
-      updated_at: new Date()
-    };
-    
-    // Here you would typically make an API call to update the tag
-    console.log('Updating tag:', updatedTag);
-    
-    // Update mock store
-    tags = tags.map(t => t.id === tag!.id ? updatedTag : t);
-    tag = updatedTag;
-    
-    isEditing = false;
-    showColorPicker = false;
-  }
-  
+    try {
+        const updateData = {
+        name: editName.trim(),
+        description: editDescription.trim() || undefined,
+        color: editColor,
+        parent_id: editParentId || undefined,
+        };
+        
+        await tagsStore.updateTag(tag.id, updateData);
+        
+        isEditing = false;
+        showColorPicker = false;
+    } catch (err) {
+        console.error('Failed to update tag:', err);
+        errors.submit = err instanceof Error ? err.message : 'Failed to update tag. Please try again.';
+    }
+    }
+
   async function deleteTag() {
     if (!tag) return;
     
-    // In a real app, you'd check if the tag is being used and handle cascading
-    console.log('Deleting tag:', tag);
-    
-    // Remove from mock store
-    tags = tags.filter(t => t.id !== tag!.id);
-    
-    goto('/tags');
-  }
+    try {
+        await tagsStore.deleteTag(tag.id);
+        goto('/tags');
+    } catch (err) {
+        console.error('Failed to delete tag:', err);
+        // Show error to user
+    }
+    }
   
   function selectColor(selectedColor: string) {
     editColor = selectedColor;
@@ -178,13 +183,42 @@
     
     return path;
   }
+
+  // Helper function to format the date
+  function formatDate(dateString: string | Date | undefined): string {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      // Check if the date parsing was successful and it's a valid date
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      return date.toLocaleDateString(); // Or customize format: 'en-US', options
+    } catch (e) {
+      console.error("Error parsing date:", e);
+      return 'Invalid Date';
+    }
+  }
 </script>
 
 <svelte:head>
   <title>{tag?.name || 'Tag'} - PKMS</title>
 </svelte:head>
 
-{#if tag}
+<!-- Add loading state -->
+{#if isLoading && !tag}
+  <div class="flex items-center justify-center py-12">
+    <div class="flex items-center space-x-3 text-gray-400">
+      <RefreshCw class="w-5 h-5 animate-spin" />
+      <span>Loading tag...</span>
+    </div>
+  </div>
+{:else if error}
+  <!-- Add error state -->
+  <div class="bg-red-900/20 border border-red-700 rounded-lg p-4">
+    <p class="text-red-400">Error loading tag: {error}</p>
+  </div>
+{:else if tag}
   <div class="max-w-4xl mx-auto space-y-6">
     <!-- Header -->
     <div class="flex items-center justify-between">
@@ -387,7 +421,7 @@
                 <Calendar class="w-4 h-4" />
                 <div>
                   <div class="metadata-label">Created</div>
-                  <div class="metadata-value">{tag.created_at.toLocaleDateString()}</div>
+                  <div class="metadata-value">{formatDate(tag.created_at)}</div>
                 </div>
               </div>
               
@@ -395,7 +429,7 @@
                 <Calendar class="w-4 h-4" />
                 <div>
                   <div class="metadata-label">Updated</div>
-                  <div class="metadata-value">{tag.updated_at.toLocaleDateString()}</div>
+                  <div class="metadata-value">{formatDate(tag.updated_at)}</div>
                 </div>
               </div>
               
