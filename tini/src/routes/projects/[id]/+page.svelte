@@ -15,7 +15,7 @@
 
   let title = '';
   let content = '';
-  let status = 'DRAFT';
+  let status = 'ACTIVE';
   let selectedFolder: ProjectFolder | null = null;
   let selectedTags: Tag[] = [];
   let isSubmitting = false;

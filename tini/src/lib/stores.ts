@@ -43,6 +43,7 @@ export const mockNotes: Note[] = [
   }
 ];
 
+// In src/lib/stores.ts
 export const mockTags: Tag[] = [
   {
     id: '1',
@@ -65,8 +66,34 @@ export const mockTags: Tag[] = [
     name: 'Neuroscience',
     description: 'Brain science and neuroscience',
     color: '#059669',
-    parent_id: '1',
+    parent_id: '1', // Child of Consciousness
     created_at: new Date(),
     updated_at: new Date()
-  }
+  },
+  {
+    id: '4',
+    name: 'Ethics',
+    description: 'Ethical considerations in AI and research',
+    color: '#d97706',
+    parent_id: '2', // Child of AI
+    created_at: new Date(),
+    updated_at: new Date()
+  },
+  {
+    id: '5',
+    name: 'Philosophy',
+    description: 'Philosophical concepts',
+    color: '#be185d',
+    created_at: new Date(),
+    updated_at: new Date()
+  },
+   {
+    id: '6',
+    name: 'Logic',
+    description: 'Study of reasoning',
+    color: '#65a30d',
+    parent_id: '5', // Child of Philosophy
+    created_at: new Date(),
+    updated_at: new Date()
+  },
 ];
