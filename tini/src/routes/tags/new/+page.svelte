@@ -287,7 +287,7 @@
     font-size: 0.875rem;
   }
   
-  .form-input, .form-textarea, .form-select {
+  .form-input, .form-textarea {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 8px;
@@ -297,7 +297,31 @@
     transition: all 0.2s ease;
   }
   
-  .form-input:focus, .form-textarea:focus, .form-select:focus {
+  .form-input:focus, .form-textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  .form-select {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: #f9fafb;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%239ca3af' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 16px 12px;
+  }
+
+  .form-select option {
+    background-color: #1f2937;
+    color: #f9fafb;
+  }
+
+  .form-select:focus {
     outline: none;
     border-color: #3b82f6;
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
@@ -341,10 +365,10 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   }
   
-  .color-input {
+  /* .color-input {
     flex: 1;
     font-family: 'Monaco', 'Menlo', monospace;
-  }
+  } */
   
   .color-palette {
     position: absolute;
@@ -359,6 +383,32 @@
     backdrop-filter: blur(10px);
     z-index: 10;
   }
+
+  .color-input {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    color: #f9fafb;
+    font-family: monospace;
+    width: 120px;
+  }
+
+  .color-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  .color-input.error {
+    border-color: #ef4444;
+  }
+
+  .color-input::placeholder {
+    color: #6b7280;
+    opacity: 1;
+  }
+
   
   .palette-grid {
     display: grid;
