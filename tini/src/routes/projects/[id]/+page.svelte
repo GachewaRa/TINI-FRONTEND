@@ -31,7 +31,6 @@
   );
 
   const statusOptions = [
-    { value: 'DRAFT', label: 'Draft', description: 'Work in progress' },
     { value: 'ACTIVE', label: 'Active', description: 'Currently working on' },
     { value: 'COMPLETED', label: 'Completed', description: 'Finished project' },
     { value: 'ARCHIVED', label: 'Archived', description: 'No longer active' }
@@ -154,8 +153,6 @@
     switch (statusValue) {
       case 'ACTIVE':
         return 'text-green-400 bg-green-400/10 border-green-400/20';
-      case 'DRAFT':
-        return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20';
       case 'COMPLETED':
         return 'text-blue-400 bg-blue-400/10 border-blue-400/20';
       case 'ARCHIVED':

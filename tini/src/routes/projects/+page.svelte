@@ -1,12 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { Search, Plus, Folder, FileText, Calendar, Tag as TagIcon, Filter, RefreshCw, AlertCircle } from 'lucide-svelte';
-  // --- START MODIFICATION (Imports) ---
-  // Import the specific stores and their methods
   import { projectsStore, projects, projectsLoading, projectsError } from '$lib/stores/projects';
   import { projectFoldersStore, projectFolders, projectFoldersLoading, projectFoldersError } from '$lib/stores/projectFolders';
   import { tagsStore, tags, tagsLoading, tagsError } from '$lib/stores/tags'; // Assuming tags store is already set up to fetch from API
-  // --- END MODIFICATION (Imports) ---
+ 
 
   import SearchFilter from '$lib/components/SearchFilter.svelte';
   import type { Project, ProjectFolder, Tag } from '$lib/types/projects'; // Adjust path if needed
@@ -17,16 +15,13 @@
   let filteredProjects: Project[] = [];
   let showFilters = false;
   
-  // --- START MODIFICATION (Reactive Store Values) ---
   // Reactive values from stores
   $: allProjects = $projects;
   $: allFolders = $projectFolders;
   $: isLoading = $projectsLoading || $projectFoldersLoading || $tagsLoading; // Include tagsLoading if SearchFilter relies on it
   $: error = $projectsError || $projectFoldersError || $tagsError; // Include tagsError
   $: totalProjects = allProjects.length;
-  // --- END MODIFICATION (Reactive Store Values) ---
-
-  // --- START MODIFICATION (onMount and Refresh) ---
+  
   onMount(async () => {
     // Load projects, folders, and tags from the backend
     await Promise.all([
@@ -48,9 +43,7 @@
       console.error('Refresh failed:', err);
     });
   }
-  // --- END MODIFICATION (onMount and Refresh) ---
-  
-  // Reactive filtering logic remains mostly the same, just using `allProjects`
+
   $: {
     filteredProjects = allProjects.filter(project => {
       // Text search
@@ -83,8 +76,6 @@
     switch (status) {
       case 'ACTIVE':
         return 'text-green-400 bg-green-400/10';
-      case 'DRAFT':
-        return 'text-yellow-400 bg-yellow-400/10';
       case 'COMPLETED':
         return 'text-blue-400 bg-blue-400/10';
       case 'ARCHIVED':
@@ -217,6 +208,49 @@
       </div>
     {/if}
   </div>
+
+
+  <!-- Add this section to your existing projects page after the search filters -->
+  <!-- Active filters display -->
+  {#if selectedFolder || selectedTags.length > 0}
+    <div class="flex flex-wrap items-center gap-2 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+      <span class="text-sm font-medium text-gray-300">Active filters:</span>
+      
+      {#if selectedFolder}
+        <div class="flex items-center space-x-2 px-3 py-1 bg-yellow-600/20 border border-yellow-600/30 rounded-full">
+          <Folder class="w-3 h-3 text-yellow-400" />
+          <span class="text-sm text-yellow-300">{selectedFolder.name}</span>
+          <button
+            on:click={() => selectedFolder = null}
+            class="text-yellow-400 hover:text-yellow-300 ml-1"
+          >
+            ×
+          </button>
+        </div>
+      {/if}
+      
+      {#each selectedTags as tag}
+        <div class="flex items-center space-x-2 px-3 py-1 bg-blue-600/20 border border-blue-600/30 rounded-full">
+          <TagIcon class="w-3 h-3 text-blue-400" />
+          <span class="text-sm text-blue-300">{tag.name}</span>
+          <button
+            on:click={() => selectedTags = selectedTags.filter(t => t.id !== tag.id)}
+            class="text-blue-400 hover:text-blue-300 ml-1"
+          >
+            ×
+          </button>
+        </div>
+      {/each}
+      
+      <button
+        on:click={clearFilters}
+        class="text-xs text-gray-400 hover:text-gray-300 underline ml-2"
+      >
+        Clear all
+      </button>
+    </div>
+  {/if}
+
   
   {#if isLoading && allProjects.length === 0 && !error}
     <div class="flex items-center justify-center py-12">
