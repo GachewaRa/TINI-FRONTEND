@@ -21,6 +21,16 @@ export class ProjectsAPI {
   }
 
   /**
+   * Get all projects in a specific folder
+   */
+  static async getProjectsInFolder(folderId: string): Promise<ProjectResponse[]> {
+    return withLoading(
+      apiClient.get<ProjectResponse[]>(`/api/v1/projects/folders/${folderId}/projects`)
+    );
+  }
+
+
+  /**
    * Get a specific project by ID
    */
   static async getProject(projectId: string): Promise<ProjectResponse> {
