@@ -9,6 +9,9 @@
   import { projects, projectFolders, tags as availableTagsStore, notes as allNotesStore } from '$lib/stores';
   import type { Project, ProjectFolder, Tag, Note } from '$lib/types';
   import { get } from 'svelte/store';
+  import { projectsStore } from '$lib/stores/projects';
+import { ProjectsAPI } from '$lib/api/projects';
+    import { tagsStore } from '$lib/stores/tags';
 
   let projectId: string;
   let project: Project | null = null;
@@ -49,25 +52,47 @@
     allNotes = value;
   });
 
-  onMount(() => {
-    projectId = $page.params.id; // Get ID from URL
-    const currentProjects = get(projects);
-    const foundProject = currentProjects.find(p => p.id === projectId);
+  onMount(async () => {
+    projectId = $page.params.id;
+    
+    try {
+      // Load the project from API if not in store
+      await projectsStore.load();
+      
+      // Find project in store
+      const foundProject = $projects.find(p => p.id === projectId);
+      
+      if (!foundProject) {
+        // If not in store, try fetching directly
+        const apiProject = await ProjectsAPI.getProject(projectId);
+        project = {
+          ...apiProject,
+          created_at: new Date(apiProject.created_at),
+          updated_at: new Date(apiProject.updated_at)
+        };
+      } else {
+        project = foundProject;
+      }
 
-    if (foundProject) {
-      project = foundProject;
+      // Initialize form fields
       title = project.title;
       content = project.content;
       status = project.status;
-
-      // Find and set selected folder object
-      if (project.folder_id) {
-        selectedFolder = get(projectFolders).find(f => f.id === project.folder_id) || null;
+      
+      // Load folders if needed
+      if (project.folder_id && $projectFolders.length === 0) {
+        await projectFoldersStore.load();
+      }
+      selectedFolder = $projectFolders.find(f => f.id === project.folder_id) || null;
+      
+      // Load tags if needed
+      if (project.tags && $availableTagsStore.length === 0) { 
+        await tagsStore.load();
       }
       selectedTags = project.tags || [];
-    } else {
-      // Handle project not found, e.g., redirect to projects list
-      console.warn(`Project with ID ${projectId} not found.`);
+      
+    } catch (error) {
+      console.error('Failed to load project:', error);
       goto('/projects');
     }
   });
@@ -87,38 +112,31 @@
   }
 
   async function handleSubmit() {
-    if (!validateForm()) return;
+    if (!validateForm() || !project) return;
 
     isSubmitting = true;
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      if (!project) {
-        console.error('No project loaded to update.');
-        return;
-      }
-
-      const updatedProject: Project = {
-        ...project, // Keep existing properties
+      const updateData = {
         title: title.trim(),
         content: content.trim(),
-        status: status as Project['status'],
-        folder_id: selectedFolder?.id,
-        updated_at: new Date(),
-        tags: selectedTags,
-        // notes are updated via `note_project` relationship, not directly here
+        status,
+        folder_id: selectedFolder?.id || null,
+        tags: selectedTags.map(t => t.id) // Send just tag IDs
       };
 
-      // Update the store
-      projects.update(currentProjects =>
-        currentProjects.map(p => (p.id === updatedProject.id ? updatedProject : p))
-      );
+      // Update via API
+      const updatedProject = await ProjectsAPI.updateProject(project.id, updateData);
+      
+      // Update local store
+      // projectsStore.updateProject(updatedProject);
+      
+      // Update local project reference
+      project = updatedProject;
 
-      // No redirect needed, stay on the page
     } catch (error) {
       console.error('Error updating project:', error);
+      errors.submit = error.message || 'Failed to update project';
     } finally {
       isSubmitting = false;
     }
@@ -131,15 +149,14 @@
       return;
     }
 
-    isSubmitting = true; // Use submitting for delete as well
+    isSubmitting = true;
     try {
-      // Simulate API call for deletion
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      projects.update(currentProjects => currentProjects.filter(p => p.id !== project?.id));
-      goto('/projects'); // Redirect to projects list after deletion
+      await ProjectsAPI.deleteProject(project.id);
+      ProjectsAPI.deleteProject(project.id);
+      goto('/projects');
     } catch (error) {
       console.error('Error deleting project:', error);
+      errors.submit = error.message || 'Failed to delete project';
     } finally {
       isSubmitting = false;
     }
@@ -252,6 +269,12 @@
             <p class="mt-1 text-sm text-red-400">{errors.content}</p>
           {/if}
         </div>
+
+        {#if errors.submit}
+          <div class="bg-red-900/20 border border-red-700 rounded-lg p-4 mb-6">
+            <p class="text-red-400">{errors.submit}</p>
+          </div>
+        {/if}
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>

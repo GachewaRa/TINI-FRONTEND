@@ -34,15 +34,12 @@ export const projectsStore = {
       set({ projects: [], isLoading: false, error: err.detail || 'Failed to load projects' });
     }
   },
-  // --- START MODIFICATION ---
-  // Method to add a new project to the store (after successful API creation)
   addProject: (newProject: Project) => {
     update(state => ({
       ...state,
       projects: [...state.projects, newProject]
     }));
   },
-  // --- END MODIFICATION ---
   clearError: () => update(state => ({ ...state, error: null })),
   refresh: async () => {
     await projectsStore.load();

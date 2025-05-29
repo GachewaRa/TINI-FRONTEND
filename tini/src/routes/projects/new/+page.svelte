@@ -42,7 +42,7 @@
       selectedFolder = allProjectFolders[0];
     }
   });
-  console.log("ALL PROJECT FOLDERS:", allProjectFolders)
+
 
   $: {
     allAvailableTags = $tags;
