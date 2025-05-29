@@ -5,6 +5,7 @@
   import type { Tag } from '$lib/types';
   
   export let selectedTags: Tag[] = [];
+  export let availableTags: Tag[] = []; // Add this line
   
   let showTagInput = false;
   let newTagName = '';
@@ -116,7 +117,7 @@
     <!-- Tag List -->
     <div class="max-h-32 overflow-y-auto">
       <div class="flex flex-wrap gap-2">
-        {#each $tags.filter(tag => !selectedTags.find(st => st.id === tag.id)) as tag}
+        {#each availableTags.filter(tag => !selectedTags.find(st => st.id === tag.id)) as tag}
           <button
             on:click={() => addTag(tag)}
             class="px-3 py-1 rounded-full text-sm font-medium transition-all duration-200 hover:scale-105"
@@ -129,4 +130,3 @@
     </div>
   </div>
 </div>
-

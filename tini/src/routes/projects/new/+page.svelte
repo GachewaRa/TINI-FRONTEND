@@ -4,16 +4,15 @@
   import { Save, ArrowLeft, Folder, Tag as TagIcon } from 'lucide-svelte';
   import TinyMCEEditor from '$lib/components/TinyMCEEditor.svelte';
   import TagSelector from '$lib/components/TagSelector.svelte';
-  // --- START MODIFICATION ---
-  // Import the actual stores and their methods for loading
-  import {  projectFolders, tags as availableTagsStore } from '$lib/stores'; // Make sure projectsStore and projectFoldersStore are imported
-  import { ProjectsAPI } from '$lib/api/projects'; // Import your ProjectsAPI client
-  import type { Project, ProjectFolder, ProjectCreate } from '$lib/types/projects'; // Import ProjectCreate type
-    import type { Tag } from '$lib/types/tags';
-    import { tagsStore } from '$lib/stores/tags';
-    import { projectFoldersStore } from '$lib/stores/projectFolders';
-    import { projectsStore } from '$lib/stores/projects';
-  // --- END MODIFICATION ---
+  
+  // FIXED IMPORTS - Use the correct store exports
+  import { projectFolders } from '$lib/stores'; // Keep this if it's working
+  import { tags, tagsStore } from '$lib/stores/tags'; // Import both the derived store and main store
+  import { projectFoldersStore } from '$lib/stores/projectFolders';
+  import { projectsStore } from '$lib/stores/projects';
+  import { ProjectsAPI } from '$lib/api/projects';
+  import type { Project, ProjectFolder, ProjectCreate } from '$lib/types/projects';
+  import type { Tag } from '$lib/types/tags';
 
   let title = '';
   let content = '';
@@ -26,19 +25,15 @@
   let allProjectFolders: ProjectFolder[] = [];
   let allAvailableTags: Tag[] = [];
 
-  // --- START MODIFICATION ---
   // Load data for folders and tags on mount
   onMount(async () => {
-    // These stores are already set up to fetch data. Just ensure they are loaded.
     await Promise.all([
       projectFoldersStore.load(),
-      tagsStore.load()
+      tagsStore.load() // This should now work correctly
     ]);
   });
-  // --- END MODIFICATION ---
 
-  // Subscribe to stores to get current data
-  // These subscriptions are fine, they react to changes in the stores
+  // FIXED SUBSCRIPTIONS - Use the correct derived stores
   projectFolders.subscribe(value => {
     allProjectFolders = value;
     if (!selectedFolder && allProjectFolders.length > 0) {
@@ -46,9 +41,16 @@
     }
   });
 
-  availableTagsStore.subscribe(value => {
-    allAvailableTags = value;
-  });
+  // Use the correct derived tags store
+  // tags.subscribe(value => {
+  //   allAvailableTags = value;
+  //   console.log('Available tags loaded:', allAvailableTags); // Debug log
+  // });
+
+  $: {
+    allAvailableTags = $tags;
+    console.log('Available tags loaded:', allAvailableTags); // Debug log
+  }
 
   const statusOptions = [
     { value: 'ACTIVE', label: 'Active', description: 'Currently working on' },
@@ -79,7 +81,7 @@
       const projectData: ProjectCreate = {
         title: title.trim(),
         content: content.trim(),
-        status: status as Project['status'], // Keep original case (ACTIVE, COMPLETED, ARCHIVED)
+        status: status as Project['status'],
         folder_id: selectedFolder?.id ? selectedFolder.id.toString() : null,
         tags: selectedTags.map(tag => tag.id.toString())
       };
@@ -119,7 +121,7 @@
       case 'COMPLETED':
         return 'text-blue-400 bg-blue-400/10 border-blue-400/20';
       case 'ARCHIVED':
-      return 'text-gray-400 bg-gray-400/10 border-gray-400/20';
+        return 'text-gray-400 bg-gray-400/10 border-gray-400/20';
       default:
         return 'text-gray-400 bg-gray-400/10 border-gray-400/20';
     }
@@ -260,12 +262,19 @@
         </div>
       </div>
     </div>
-
     <div>
-      <label for="tags" class="block text-sm font-medium text-gray-300 mb-2">
-        Tags
-      </label>
-      <TagSelector bind:selectedTags={selectedTags} availableTags={allAvailableTags} />
-    </div>
+    <label for="tags" class="block text-sm font-medium text-gray-300 mb-2">
+      Tags
+    </label>
+    {#if allAvailableTags.length > 0}
+      <TagSelector 
+        bind:selectedTags={selectedTags} 
+        availableTags={allAvailableTags} 
+      />
+    {:else}
+      <div class="text-sm text-gray-400">Loading tags...</div>
+    {/if}
+  </div>
+
   </div>
 </div>

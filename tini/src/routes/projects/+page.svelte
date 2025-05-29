@@ -279,7 +279,7 @@
               </div>
               <div class="flex items-center space-x-1">
                 <FileText class="w-3 h-3" />
-                <span>{project.notes.length} notes</span>
+                <span>{(project.notes ?? []).length} notes</span>
               </div>
             </div>
             <a
