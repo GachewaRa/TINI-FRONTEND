@@ -4,12 +4,13 @@
   import { Save, ArrowLeft, Folder, Tag as TagIcon } from 'lucide-svelte';
   import TinyMCEEditor from '$lib/components/TinyMCEEditor.svelte';
   import TagSelector from '$lib/components/TagSelector.svelte';
-  import { projectFolders } from '$lib/stores'; // Keep this if it's working
+  // import { projectFolders } from '$lib/stores';
+  import { projectFolders } from '$lib/stores/projectFolders';
   import { tags, tagsStore } from '$lib/stores/tags'; // Import both the derived store and main store
   import { projectFoldersStore } from '$lib/stores/projectFolders';
   import { projectsStore } from '$lib/stores/projects';
   import { ProjectsAPI } from '$lib/api/projects';
-  import type { Project, ProjectFolder } from '$lib/types/projects';
+  import type { Project, ProjectCreate, ProjectFolder } from '$lib/types/projects';
   import type { Tag } from '$lib/types/tags';
 
   let title = '';
@@ -25,10 +26,14 @@
 
   // Load data for folders and tags on mount
   onMount(async () => {
-    await Promise.all([
-      projectFoldersStore.load(),
-      tagsStore.load()
-    ]);
+    try {
+      await Promise.all([
+        projectFoldersStore.load(),
+        tagsStore.load()
+      ]);
+    } catch (err) {
+      console.error('Failed to load data:', err);
+    }
   });
 
   projectFolders.subscribe(value => {
@@ -37,6 +42,7 @@
       selectedFolder = allProjectFolders[0];
     }
   });
+  console.log("ALL PROJECT FOLDERS:", allProjectFolders)
 
   $: {
     allAvailableTags = $tags;
@@ -76,8 +82,6 @@
         tags: selectedTags.map(tag => tag.id.toString())
       };
 
-      console.log("PROJECT DATA TO CREATE: ", projectData)
-
       const createdProjectResponse = await ProjectsAPI.createProject(projectData);
 
       const newProject: Project = {
@@ -106,8 +110,6 @@
     switch (statusValue) {
       case 'ACTIVE':
         return 'text-green-400 bg-green-400/10 border-green-400/20';
-      case 'DRAFT':
-        return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20';
       case 'COMPLETED':
         return 'text-blue-400 bg-blue-400/10 border-blue-400/20';
       case 'ARCHIVED':
