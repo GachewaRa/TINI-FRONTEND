@@ -4,24 +4,43 @@
   import { Save, ArrowLeft, Folder, Tag as TagIcon } from 'lucide-svelte';
   import TinyMCEEditor from '$lib/components/TinyMCEEditor.svelte';
   import TagSelector from '$lib/components/TagSelector.svelte';
-  import { projects, projectFolders, tags as availableTagsStore } from '$lib/stores'; // Renamed tags to availableTagsStore to avoid conflict
-  import type { Project, ProjectFolder, Tag } from '$lib/types';
+  // --- START MODIFICATION ---
+  // Import the actual stores and their methods for loading
+  import {  projectFolders, tags as availableTagsStore } from '$lib/stores'; // Make sure projectsStore and projectFoldersStore are imported
+  import { ProjectsAPI } from '$lib/api/projects'; // Import your ProjectsAPI client
+  import type { Project, ProjectFolder, ProjectCreate } from '$lib/types/projects'; // Import ProjectCreate type
+    import type { Tag } from '$lib/types/tags';
+    import { tagsStore } from '$lib/stores/tags';
+    import { projectFoldersStore } from '$lib/stores/projectFolders';
+    import { projectsStore } from '$lib/stores/projects';
+  // --- END MODIFICATION ---
 
   let title = '';
   let content = '';
-  let status = 'DRAFT';
+  let status = 'ACTIVE';
   let selectedFolder: ProjectFolder | null = null;
   let selectedTags: Tag[] = [];
   let isSubmitting = false;
   let errors: { [key: string]: string } = {};
 
-  let allProjectFolders: ProjectFolder[] = []; // To store available project folders
-  let allAvailableTags: Tag[] = []; // To store available tags
+  let allProjectFolders: ProjectFolder[] = [];
+  let allAvailableTags: Tag[] = [];
+
+  // --- START MODIFICATION ---
+  // Load data for folders and tags on mount
+  onMount(async () => {
+    // These stores are already set up to fetch data. Just ensure they are loaded.
+    await Promise.all([
+      projectFoldersStore.load(),
+      tagsStore.load()
+    ]);
+  });
+  // --- END MODIFICATION ---
 
   // Subscribe to stores to get current data
+  // These subscriptions are fine, they react to changes in the stores
   projectFolders.subscribe(value => {
     allProjectFolders = value;
-    // Set default folder if available and not already selected
     if (!selectedFolder && allProjectFolders.length > 0) {
       selectedFolder = allProjectFolders[0];
     }
@@ -32,7 +51,6 @@
   });
 
   const statusOptions = [
-    { value: 'DRAFT', label: 'Draft', description: 'Work in progress' },
     { value: 'ACTIVE', label: 'Active', description: 'Currently working on' },
     { value: 'COMPLETED', label: 'Completed', description: 'Finished project' },
     { value: 'ARCHIVED', label: 'Archived', description: 'No longer active' }
@@ -58,28 +76,31 @@
     isSubmitting = true;
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const newProject: Project = {
-        id: Date.now().toString(),
+      const projectData: ProjectCreate = {
         title: title.trim(),
         content: content.trim(),
-        status: status as Project['status'], // Ensure type correctness
-        folder_id: selectedFolder?.id,
-        created_at: new Date(),
-        updated_at: new Date(),
-        tags: selectedTags,
-        notes: []
+        status: status as Project['status'], // Keep original case (ACTIVE, COMPLETED, ARCHIVED)
+        folder_id: selectedFolder?.id ? selectedFolder.id.toString() : null,
+        tags: selectedTags.map(tag => tag.id.toString())
       };
 
-      // Add to store
-      projects.update(current => [...current, newProject]);
+      console.log("PROJECT DATA TO CREATE: ", projectData)
 
-      // Redirect to project detail
+      const createdProjectResponse = await ProjectsAPI.createProject(projectData);
+
+      const newProject: Project = {
+        ...createdProjectResponse,
+        created_at: new Date(createdProjectResponse.created_at),
+        updated_at: new Date(createdProjectResponse.updated_at),
+        tags: createdProjectResponse.tags || [],
+        notes: createdProjectResponse.notes || []
+      };
+
+      projectsStore.addProject(newProject);
       goto(`/projects/${newProject.id}`);
     } catch (error) {
       console.error('Error creating project:', error);
+      errors.submit = error instanceof Error ? error.message : 'Failed to create project.';
     } finally {
       isSubmitting = false;
     }
@@ -104,6 +125,10 @@
     }
   }
 </script>
+
+{#if errors.submit}
+  <p class="mt-4 text-sm text-red-400 text-center">{errors.submit}</p>
+{/if}
 
 <svelte:head>
   <title>New Project - PKMS</title>
