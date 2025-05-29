@@ -20,7 +20,7 @@ const { subscribe, set, update } = writable<ProjectFoldersState>(initialState);
 
 export const projectFoldersStore = {
   subscribe,
-  load: async () => { // Renamed from loadFolders to load for consistency
+  load: async () => { 
     update(state => ({ ...state, isLoading: true, error: null }));
     try {
       const data: ProjectFolderResponse[] = await ProjectFoldersAPI.getProjectFolders();

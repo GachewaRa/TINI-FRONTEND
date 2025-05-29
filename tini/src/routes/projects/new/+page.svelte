@@ -4,14 +4,12 @@
   import { Save, ArrowLeft, Folder, Tag as TagIcon } from 'lucide-svelte';
   import TinyMCEEditor from '$lib/components/TinyMCEEditor.svelte';
   import TagSelector from '$lib/components/TagSelector.svelte';
-  
-  // FIXED IMPORTS - Use the correct store exports
   import { projectFolders } from '$lib/stores'; // Keep this if it's working
   import { tags, tagsStore } from '$lib/stores/tags'; // Import both the derived store and main store
   import { projectFoldersStore } from '$lib/stores/projectFolders';
   import { projectsStore } from '$lib/stores/projects';
   import { ProjectsAPI } from '$lib/api/projects';
-  import type { Project, ProjectFolder, ProjectCreate } from '$lib/types/projects';
+  import type { Project, ProjectFolder } from '$lib/types/projects';
   import type { Tag } from '$lib/types/tags';
 
   let title = '';
@@ -29,11 +27,10 @@
   onMount(async () => {
     await Promise.all([
       projectFoldersStore.load(),
-      tagsStore.load() // This should now work correctly
+      tagsStore.load()
     ]);
   });
 
-  // FIXED SUBSCRIPTIONS - Use the correct derived stores
   projectFolders.subscribe(value => {
     allProjectFolders = value;
     if (!selectedFolder && allProjectFolders.length > 0) {
@@ -41,15 +38,8 @@
     }
   });
 
-  // Use the correct derived tags store
-  // tags.subscribe(value => {
-  //   allAvailableTags = value;
-  //   console.log('Available tags loaded:', allAvailableTags); // Debug log
-  // });
-
   $: {
     allAvailableTags = $tags;
-    console.log('Available tags loaded:', allAvailableTags); // Debug log
   }
 
   const statusOptions = [
