@@ -8,12 +8,14 @@
   import TagSelector from '$lib/components/TagSelector.svelte';
   import { NotesAPI } from '$lib/api/notes';
   import type { Note, Tag, Comment } from '$lib/types';
+  import { tags } from '$lib/stores/tags';
   
   let note: Note | null = null;
   let title = '';
   let content = '';
   let source = '';
   let selectedTags: Tag[] = [];
+  let allAvailableTags: Tag[] = [];
   let isLoading = false;
   let isLoadingNote = true;
   let error = '';
@@ -24,6 +26,7 @@
   let isAddingComment = false;
   
   $: noteId = $page.params.id;
+  $: allAvailableTags = $tags;
   
   onMount(async () => {
     await loadNote();
@@ -205,7 +208,14 @@
       <!-- Tags -->
       <div class="space-y-2">
         <label class="block text-sm font-medium text-gray-300">Tags</label>
-        <TagSelector bind:selectedTags disabled={isLoading} />
+        {#if allAvailableTags.length > 0}
+        <TagSelector 
+            bind:selectedTags={selectedTags} 
+            availableTags={allAvailableTags} 
+        />
+        {:else}
+            <div class="text-sm text-gray-400">Loading tags...</div>
+        {/if}
       </div>
       
       <!-- Content -->
