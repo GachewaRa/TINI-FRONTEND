@@ -7,6 +7,8 @@
   export let disabled = false;
   export let height = 400;
   export let showCreateNoteButton = false; // For highlights view
+
+  export let uploadEndpoint = 'http://127.0.0.1:8000/api/v1/uploads/image/'; // Your FastAPI endpoint
   
   let editor: any;
   let editorContainer: HTMLElement;
@@ -38,6 +40,28 @@
         'bold italic backcolor | alignleft aligncenter ' +
         'alignright alignjustify | bullist numlist outdent indent | ' +
         'removeformat | help' + (showCreateNoteButton ? ' | createnote' : ''),
+
+      images_upload_handler: async (blobInfo, progress) => {
+        const formData = new FormData();
+        formData.append('file', blobInfo.blob(), blobInfo.filename());
+        
+        try {
+          const response = await fetch(uploadEndpoint, {
+            method: 'POST',
+            body: formData
+          });
+          
+          if (!response.ok) throw new Error('Upload failed');
+          
+          const result = await response.json();
+          return result.location; // Match your endpoint's response
+        } catch (error) {
+          console.error('Upload error:', error);
+          return Promise.reject('Upload failed: ' + error.message);
+        }
+      },
+    
+
       content_style: `
         body { 
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
