@@ -45,7 +45,7 @@
     try {
       [availableProjects, availableMatters] = await Promise.all([
         NotesAPI.getProjects(),
-        NotesAPI.getMatters()
+        // NotesAPI.getMatters()
       ]);
     } catch (err) {
       console.error('Error loading projects/matters:', err);

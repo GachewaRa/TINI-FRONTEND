@@ -112,13 +112,13 @@ export class NotesAPI {
   }
 
   // Get available projects (assuming this endpoint exists)
-  static async getProjects(): Promise<Project[]> {
-    const response = await fetch(`${API_BASE}/projects/`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch projects: ${response.statusText}`);
-    }
-    return response.json();
-  }
+  // static async getProjects(): Promise<Project[]> {
+  //   const response = await fetch(`${API_BASE}/projects/`);
+  //   if (!response.ok) {
+  //     throw new Error(`Failed to fetch projects: ${response.statusText}`);
+  //   }
+  //   return response.json();
+  // }
 
   // Get available matters (assuming this endpoint exists)
 //   static async getMatters(): Promise<Matter[]> {
