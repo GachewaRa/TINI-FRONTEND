@@ -36,10 +36,26 @@
         'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
         'insertdatetime', 'media', 'table', 'help', 'wordcount'
       ],
-      toolbar: 'undo redo | blocks | ' +
+      // toolbar: 'undo redo | blocks | ' +
+      //   'bold italic backcolor | alignleft aligncenter ' +
+      //   'alignright alignjustify | bullist numlist outdent indent | ' +
+      //   'removeformat | help' + (showCreateNoteButton ? ' | createnote' : ''),
+      toolbar: 'undo redo | blocks | fontselect fontsizeselect | ' +
         'bold italic backcolor | alignleft aligncenter ' +
         'alignright alignjustify | bullist numlist outdent indent | ' +
         'removeformat | help' + (showCreateNoteButton ? ' | createnote' : ''),
+
+      font_family_formats: `
+        Poppins=Poppins, sans-serif;
+        Azonix=Azonix, sans-serif;
+        KIONA=KIONA, sans-serif;
+        Boldonse=Boldonse, sans-serif;
+        Roboto=Roboto, sans-serif;
+        Arial=arial,helvetica,sans-serif;
+        Courier New=courier new,courier,monospace;
+        Times New Roman=times new roman,times;
+      `,
+
 
       images_upload_handler: async (blobInfo, progress) => {
         const formData = new FormData();
@@ -63,12 +79,23 @@
     
 
       content_style: `
-        body { 
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-          font-size: 14px; 
-          background-color: #374151; 
-          color: #f9fafb; 
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+        @font-face {
+          font-family: 'Azonix';
+          src: url('/fonts/Azonix.otf') format('opentype');
         }
+        @font-face {
+          font-family: 'KIONA';
+          src: url('/fonts/KIONA.ttf') format('truetype');
+        }
+
+        body {
+          font-family: 'Poppins', 'Azonix', 'KIONA', sans-serif;
+          font-size: 14px;
+          background-color: #374151;
+          color: #f9fafb;
+        }
+
         .note-highlight {
           background-color: #CC7722;
           color: white;
@@ -81,7 +108,8 @@
           font-size: 12px;
           margin-left: 4px;
         }
-      `,
+      `
+      ,
       setup: function (ed: any) {
         editor = ed;
         
@@ -133,4 +161,3 @@
 </script>
 
 <div bind:this={editorContainer}></div>
-
