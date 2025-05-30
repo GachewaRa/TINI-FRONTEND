@@ -1,16 +1,18 @@
 <!-- src/routes/highlights/new/+page.svelte -->
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { Save, ArrowLeft } from 'lucide-svelte';
+  import { Save, ArrowLeft, AlertCircle } from 'lucide-svelte';
   import TinyMCEEditor from '$lib/components/TinyMCEEditor.svelte';
   import { highlights } from '$lib/stores';
-  import type { Highlight } from '$lib/types';
+  import { createHighlight } from '$lib/api/highlights';
+  import type { CreateHighlightRequest } from '$lib/api/highlights';
   
   let book_title = '';
   let author = '';
   let content = '';
   let isSubmitting = false;
   let errors: { [key: string]: string } = {};
+  let submitError = '';
   
   function validateForm(): boolean {
     errors = {};
@@ -30,28 +32,25 @@
     if (!validateForm()) return;
     
     isSubmitting = true;
+    submitError = '';
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const newHighlight: Highlight = {
-        id: Date.now().toString(),
+      const highlightData: CreateHighlightRequest = {
         book_title: book_title.trim(),
-        author: author.trim() || undefined,
         content: content.trim(),
-        created_at: new Date(),
-        updated_at: new Date(),
-        notes_from_highlight: []
+        ...(author.trim() && { author: author.trim() })
       };
       
-      // Add to store
+      const newHighlight = await createHighlight(highlightData);
+      
+      // Add to store for immediate UI update
       highlights.update(current => [...current, newHighlight]);
       
       // Redirect to highlights list
       goto('/highlights');
     } catch (error) {
       console.error('Error creating highlight:', error);
+      submitError = error instanceof Error ? error.message : 'Failed to create highlight';
     } finally {
       isSubmitting = false;
     }
@@ -59,6 +58,10 @@
   
   function handleCancel() {
     goto('/highlights');
+  }
+  
+  function clearSubmitError() {
+    submitError = '';
   }
 </script>
 
@@ -74,6 +77,7 @@
         on:click={handleCancel}
         class="p-2 text-gray-400 hover:text-gray-200 transition-colors"
         aria-label="Go back"
+        disabled={isSubmitting}
       >
         <ArrowLeft class="w-5 h-5" />
       </button>
@@ -87,7 +91,8 @@
       <button
         type="button"
         on:click={handleCancel}
-        class="px-4 py-2 text-gray-400 hover:text-gray-200 transition-colors"
+        disabled={isSubmitting}
+        class="px-4 py-2 text-gray-400 hover:text-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         Cancel
       </button>
@@ -95,13 +100,32 @@
         type="button"
         on:click={handleSubmit}
         disabled={isSubmitting}
-        class="btn-primary flex items-center space-x-2"
+        class="btn-primary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <Save class="w-4 h-4" />
         <span>{isSubmitting ? 'Saving...' : 'Save Highlight'}</span>
       </button>
     </div>
   </div>
+  
+  <!-- Submit Error -->
+  {#if submitError}
+    <div class="card p-4 bg-red-900/20 border-red-500/30">
+      <div class="flex items-start space-x-3">
+        <AlertCircle class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+        <div class="flex-1">
+          <h4 class="text-sm font-medium text-red-400 mb-1">Error creating highlight</h4>
+          <p class="text-sm text-red-300">{submitError}</p>
+        </div>
+        <button
+          on:click={clearSubmitError}
+          class="text-red-400 hover:text-red-300 text-sm"
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  {/if}
   
   <!-- Form -->
   <div class="card p-6 space-y-6">
@@ -116,8 +140,10 @@
           type="text"
           bind:value={book_title}
           placeholder="Enter book title"
-          class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-600 focus:border-transparent"
+          disabled={isSubmitting}
+          class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-600 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
           class:border-red-500={errors.book_title}
+          on:input={clearSubmitError}
         />
         {#if errors.book_title}
           <p class="mt-1 text-sm text-red-400">{errors.book_title}</p>
@@ -133,7 +159,9 @@
           type="text"
           bind:value={author}
           placeholder="Enter author name"
-          class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-600 focus:border-transparent"
+          disabled={isSubmitting}
+          class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-600 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+          on:input={clearSubmitError}
         />
       </div>
     </div>
@@ -151,6 +179,8 @@
           bind:content
           placeholder="Paste your book highlights here..."
           height="400"
+          disabled={isSubmitting}
+          on:input={clearSubmitError}
         />
       </div>
       {#if errors.content}

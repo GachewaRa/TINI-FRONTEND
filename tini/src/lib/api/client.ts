@@ -3,7 +3,7 @@ import { browser } from '$app/environment';
 import { writable } from 'svelte/store';
 
 // Configuration
-const API_BASE_URL = 'http://127.0.0.1:8000'; // Adjust this to match your FastAPI server
+const API_BASE_URL = 'http://127.0.0.1:8000';
 
 // Error types
 export interface APIError {

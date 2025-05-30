@@ -1,47 +1,37 @@
 <!-- src/routes/highlights/+page.svelte -->
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Search, Plus, BookOpen, Calendar } from 'lucide-svelte';
+  import { Search, Plus, BookOpen, Calendar, AlertCircle, Loader2 } from 'lucide-svelte';
   import { highlights } from '$lib/stores';
+  import { fetchHighlights } from '$lib/api/highlights';
   import type { Highlight } from '$lib/types';
   
   let searchTerm = '';
   let filteredHighlights: Highlight[] = [];
+  let isLoading = true;
+  let error = '';
   
-  // Mock data for highlights
-  const mockHighlights: Highlight[] = [
-    {
-      id: '1',
-      content: 'Consciousness is perhaps the greatest mystery in science. Despite centuries of inquiry, we still struggle to understand how subjective experience arises from objective neural processes. The question of how matter gives rise to mind remains one of the most profound challenges in neuroscience and philosophy. Various theories have been proposed, from materialist reductions to dualist explanations, yet none have fully solved the puzzle.',
-      book_title: 'Consciousness Explained',
-      author: 'Daniel Dennett',
-      created_at: new Date('2024-01-15'),
-      updated_at: new Date('2024-01-15'),
-      notes_from_highlight: []
-    },
-    {
-      id: '2',
-      content: 'The hard problem of consciousness is not about the functional aspects of consciousness—the ways in which information is integrated, discriminated, and accessed. It is about experience itself. When we see red, feel pain, or taste coffee, there is something it is like to have these experiences. This qualitative, subjective aspect of mental states is what philosophers call qualia, and it poses a unique challenge to our understanding of mind.',
-      book_title: 'The Conscious Mind',
-      author: 'David Chalmers',
-      created_at: new Date('2024-02-10'),
-      updated_at: new Date('2024-02-10'),
-      notes_from_highlight: []
-    },
-    {
-      id: '3',
-      content: 'Machine learning has revolutionized our approach to artificial intelligence. Instead of programming explicit rules, we now create systems that learn patterns from data. Deep neural networks, inspired by the structure of the human brain, have achieved remarkable success in tasks ranging from image recognition to natural language processing.',
-      book_title: 'Deep Learning',
-      author: 'Ian Goodfellow',
-      created_at: new Date('2024-03-05'),
-      updated_at: new Date('2024-03-05'),
-      notes_from_highlight: []
-    }
-  ];
-  
-  onMount(() => {
-    highlights.set(mockHighlights);
+  onMount(async () => {
+    await loadHighlights();
   });
+  
+  async function loadHighlights() {
+    try {
+      isLoading = true;
+      error = '';
+      const data = await fetchHighlights();
+      highlights.set(data);
+    } catch (err) {
+      console.error('Error loading highlights:', err);
+      error = err instanceof Error ? err.message : 'Failed to load highlights';
+    } finally {
+      isLoading = false;
+    }
+  }
+  
+  async function handleRetry() {
+    await loadHighlights();
+  }
   
   // Reactive filtering
   $: {
@@ -67,7 +57,15 @@
   <div class="flex items-center justify-between">
     <div>
       <h1 class="text-3xl font-bold text-gray-200">Highlights</h1>
-      <p class="text-gray-400 mt-1">{filteredHighlights.length} highlights found</p>
+      <p class="text-gray-400 mt-1">
+        {#if isLoading}
+          Loading highlights...
+        {:else if error}
+          Error loading highlights
+        {:else}
+          {filteredHighlights.length} highlights found
+        {/if}
+      </p>
     </div>
     
     <a href="/highlights/new" class="btn-primary flex items-center space-x-2">
@@ -83,84 +81,110 @@
       type="text"
       placeholder="Search highlights by title, author, or content..."
       bind:value={searchTerm}
-      class="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-600 focus:border-transparent"
+      disabled={isLoading}
+      class="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-600 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
     />
   </div>
   
+  <!-- Loading State -->
+  {#if isLoading}
+    <div class="flex items-center justify-center py-12">
+      <div class="flex items-center space-x-3 text-gray-400">
+        <Loader2 class="w-6 h-6 animate-spin" />
+        <span>Loading highlights...</span>
+      </div>
+    </div>
+  
+  <!-- Error State -->
+  {:else if error}
+    <div class="card p-6 text-center">
+      <AlertCircle class="w-12 h-12 text-red-500 mx-auto mb-4" />
+      <h3 class="text-lg font-medium text-gray-200 mb-2">Failed to load highlights</h3>
+      <p class="text-gray-400 mb-4">{error}</p>
+      <button
+        on:click={handleRetry}
+        class="btn-primary"
+      >
+        Try Again
+      </button>
+    </div>
+  
   <!-- Highlights List -->
-  <div class="space-y-4">
-    {#each filteredHighlights as highlight (highlight.id)}
-      <div class="card p-6 hover:shadow-xl transition-all duration-200 border-l-4 border-yellow-600">
-        <!-- Header -->
-        <div class="flex items-start justify-between mb-4">
-          <div class="flex items-center space-x-3">
-            <BookOpen class="w-6 h-6 text-yellow-600 flex-shrink-0" />
-            <div>
-              <h3 class="text-lg font-semibold text-yellow-600">{highlight.book_title}</h3>
-              {#if highlight.author}
-                <p class="text-sm text-gray-400 flex items-center space-x-1">
-                  <span>by {highlight.author}</span>
+  {:else}
+    <div class="space-y-4">
+      {#each filteredHighlights as highlight (highlight.id)}
+        <div class="card p-6 hover:shadow-xl transition-all duration-200 border-l-4 border-yellow-600">
+          <!-- Header -->
+          <div class="flex items-start justify-between mb-4">
+            <div class="flex items-center space-x-3">
+              <BookOpen class="w-6 h-6 text-yellow-600 flex-shrink-0" />
+              <div>
+                <h3 class="text-lg font-semibold text-yellow-600">{highlight.book_title}</h3>
+                {#if highlight.author}
+                  <p class="text-sm text-gray-400 flex items-center space-x-1">
+                    <span>by {highlight.author}</span>
+                  </p>
+                {/if}
+              </div>
+            </div>
+            
+            <div class="flex items-center space-x-4">
+              <div class="text-right">
+                <p class="text-xs text-gray-500 flex items-center space-x-1">
+                  <Calendar class="w-3 h-3" />
+                  <span>{highlight.created_at.toLocaleDateString()}</span>
                 </p>
-              {/if}
+                <p class="text-xs text-gray-500 mt-1">
+                  {highlight.notes_from_highlight?.length || 0} notes created
+                </p>
+              </div>
+              <a 
+                href="/highlights/{highlight.id}"
+                class="text-sm text-yellow-600 hover:text-yellow-500 transition-colors font-medium"
+              >
+                Open →
+              </a>
             </div>
           </div>
           
-          <div class="flex items-center space-x-4">
-            <div class="text-right">
-              <p class="text-xs text-gray-500 flex items-center space-x-1">
-                <Calendar class="w-3 h-3" />
-                <span>{highlight.created_at.toLocaleDateString()}</span>
-              </p>
-              <p class="text-xs text-gray-500 mt-1">
-                {highlight.notes_from_highlight.length} notes created
-              </p>
+          <!-- Content Preview -->
+          <div class="text-gray-300 leading-relaxed">
+            <p class="line-clamp-4">
+              {highlight.content.substring(0, 400)}
+              {#if highlight.content.length > 400}...{/if}
+            </p>
+          </div>
+          
+          <!-- Footer -->
+          <div class="flex items-center justify-between mt-4 pt-4 border-t border-gray-700">
+            <div class="text-xs text-gray-500">
+              {Math.ceil(highlight.content.length / 5)} words
             </div>
-            <a 
-              href="/highlights/{highlight.id}"
-              class="text-sm text-yellow-600 hover:text-yellow-500 transition-colors font-medium"
-            >
-              Open →
-            </a>
+            <div class="flex items-center space-x-2">
+              <button 
+                class="text-xs text-gray-400 hover:text-yellow-600 transition-colors"
+                on:click={() => navigator.clipboard.writeText(highlight.content)}
+              >
+                Copy Content
+              </button>
+            </div>
           </div>
         </div>
-        
-        <!-- Content Preview -->
-        <div class="text-gray-300 leading-relaxed">
-          <p class="line-clamp-4">
-            {highlight.content.substring(0, 400)}
-            {#if highlight.content.length > 400}...{/if}
+      {/each}
+      
+      {#if filteredHighlights.length === 0}
+        <div class="text-center py-12">
+          <BookOpen class="w-16 h-16 text-gray-600 mx-auto mb-4" />
+          <h3 class="text-lg font-medium text-gray-400 mb-2">No highlights found</h3>
+          <p class="text-gray-500 mb-6">
+            {searchTerm ? 'Try adjusting your search terms' : 'Start by adding your first highlight'}
           </p>
+          <a href="/highlights/new" class="btn-primary inline-flex items-center space-x-2">
+            <Plus class="w-4 h-4" />
+            <span>Add Highlight</span>
+          </a>
         </div>
-        
-        <!-- Footer -->
-        <div class="flex items-center justify-between mt-4 pt-4 border-t border-gray-700">
-          <div class="text-xs text-gray-500">
-            {Math.ceil(highlight.content.length / 5)} words
-          </div>
-          <div class="flex items-center space-x-2">
-            <button 
-              class="text-xs text-gray-400 hover:text-yellow-600 transition-colors"
-              on:click={() => navigator.clipboard.writeText(highlight.content)}
-            >
-              Copy Content
-            </button>
-          </div>
-        </div>
-      </div>
-    {/each}
-    
-    {#if filteredHighlights.length === 0}
-      <div class="text-center py-12">
-        <BookOpen class="w-16 h-16 text-gray-600 mx-auto mb-4" />
-        <h3 class="text-lg font-medium text-gray-400 mb-2">No highlights found</h3>
-        <p class="text-gray-500 mb-6">
-          {searchTerm ? 'Try adjusting your search terms' : 'Start by adding your first highlight'}
-        </p>
-        <a href="/highlights/new" class="btn-primary inline-flex items-center space-x-2">
-          <Plus class="w-4 h-4" />
-          <span>Add Highlight</span>
-        </a>
-      </div>
-    {/if}
-  </div>
+      {/if}
+    </div>
+  {/if}
 </div>
