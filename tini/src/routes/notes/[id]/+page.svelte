@@ -3,31 +3,51 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
-  import { Edit, Trash2, MessageCircle, Plus, ArrowLeft } from 'lucide-svelte';
-  import { notes, mockNotes } from '$lib/stores';
+  import { Edit, Trash2, MessageCircle, ArrowLeft, FolderOpen, FileText } from 'lucide-svelte';
+  import { NotesAPI } from '$lib/api/notes';
   import type { Note } from '$lib/types';
   
   let note: Note | null = null;
-  let isEditing = false;
+  let isLoading = true;
+  let isDeleting = false;
+  let error = '';
   let showComments = false;
   
   $: noteId = $page.params.id;
   
-  onMount(() => {
-    notes.set(mockNotes);
-    notes.subscribe(n => {
-      note = n.find(note => note.id === noteId) || null;
-    });
+  onMount(async () => {
+    await loadNote();
   });
+  
+  async function loadNote() {
+    try {
+      isLoading = true;
+      error = '';
+      note = await NotesAPI.getNote(noteId);
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Failed to load note';
+      console.error('Error loading note:', err);
+    } finally {
+      isLoading = false;
+    }
+  }
   
   function editNote() {
     goto(`/notes/${noteId}/edit`);
   }
   
-  function deleteNote() {
-    if (confirm('Are you sure you want to delete this note?')) {
-      notes.update(n => n.filter(note => note.id !== noteId));
+  async function deleteNote() {
+    if (!confirm('Are you sure you want to delete this note?')) return;
+    
+    isDeleting = true;
+    
+    try {
+      await NotesAPI.deleteNote(noteId);
       goto('/notes');
+    } catch (err) {
+      console.error('Error deleting note:', err);
+      alert('Failed to delete note');
+      isDeleting = false;
     }
   }
   
@@ -40,7 +60,20 @@
   <title>{note?.title || 'Note'} - PKMS</title>
 </svelte:head>
 
-{#if note}
+{#if isLoading}
+  <div class="text-center py-12">
+    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-600 mx-auto"></div>
+    <p class="text-gray-400 mt-4">Loading note...</p>
+  </div>
+{:else if error}
+  <div class="text-center py-12">
+    <p class="text-xl text-gray-400 mb-4">Failed to load note</p>
+    <p class="text-red-400 mb-4">{error}</p>
+    <button on:click={goBack} class="btn-primary">
+      Go Back to Notes
+    </button>
+  </div>
+{:else if note}
   <div class="max-w-4xl mx-auto space-y-6">
     <!-- Header -->
     <div class="flex items-center justify-between">
@@ -77,9 +110,11 @@
         <button
           on:click={deleteNote}
           class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors flex items-center space-x-2"
+          disabled={isDeleting}
+          class:opacity-50={isDeleting}
         >
           <Trash2 class="w-4 h-4" />
-          <span>Delete</span>
+          <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
         </button>
       </div>
     </div>
@@ -95,6 +130,45 @@
             {tag.name}
           </span>
         {/each}
+      </div>
+    {/if}
+    
+    <!-- Associated Projects and Matters -->
+    {#if note.projects && note.projects.length > 0}
+      <div class="card p-4">
+        <div class="flex items-center space-x-2 text-blue-400 mb-2">
+          <FolderOpen class="w-4 h-4" />
+          <span class="font-medium">Associated Projects</span>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          {#each note.projects as project}
+            <a 
+              href="/projects/{project.id}"
+              class="px-3 py-1 bg-blue-600/20 border border-blue-600 text-blue-300 rounded-lg text-sm hover:bg-blue-600/30 transition-colors"
+            >
+              {project.name}
+            </a>
+          {/each}
+        </div>
+      </div>
+    {/if}
+    
+    {#if note.matters && note.matters.length > 0}
+      <div class="card p-4">
+        <div class="flex items-center space-x-2 text-purple-400 mb-2">
+          <FileText class="w-4 h-4" />
+          <span class="font-medium">Associated Matters</span>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          {#each note.matters as matter}
+            <a 
+              href="/matters/{matter.id}"
+              class="px-3 py-1 bg-purple-600/20 border border-purple-600 text-purple-300 rounded-lg text-sm hover:bg-purple-600/30 transition-colors"
+            >
+              {matter.name}
+            </a>
+          {/each}
+        </div>
       </div>
     {/if}
     
@@ -137,19 +211,10 @@
           <p class="text-gray-400">No comments yet.</p>
         {/if}
         
-        <!-- Add Comment Form -->
         <div class="border-t border-gray-700 pt-4">
-          <textarea
-            placeholder="Add a comment..."
-            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-600 focus:border-transparent resize-none"
-            rows="3"
-          ></textarea>
-          <div class="flex justify-end mt-2">
-            <button class="btn-primary flex items-center space-x-2">
-              <Plus class="w-4 h-4" />
-              <span>Add Comment</span>
-            </button>
-          </div>
+          <p class="text-sm text-gray-400 mb-2">
+            To add comments, use the <button on:click={editNote} class="text-yellow-400 hover:text-yellow-300 underline">Edit</button> page.
+          </p>
         </div>
       </div>
     {/if}

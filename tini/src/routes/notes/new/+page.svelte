@@ -1,52 +1,41 @@
 <!-- src/routes/notes/new/+page.svelte -->
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { Save, X, Plus } from 'lucide-svelte';
+  import { Save, X } from 'lucide-svelte';
   import TinyMCEEditor from '$lib/components/TinyMCEEditor.svelte';
   import TagSelector from '$lib/components/TagSelector.svelte';
-  import { notes, tags, mockTags } from '$lib/stores';
-  import type { Note, Tag } from '$lib/types';
-  import { onMount } from 'svelte';
+  import { NotesAPI } from '$lib/api/notes';
+  import type { Tag } from '$lib/types';
   
   let title = '';
   let content = '';
   let source = '';
   let selectedTags: Tag[] = [];
   let isLoading = false;
-  
-  onMount(() => {
-    tags.set(mockTags);
-  });
+  let error = '';
   
   async function saveNote() {
     if (!title.trim() || !content.trim() || !source.trim()) {
-      alert('Please fill in all required fields');
+      error = 'Please fill in all required fields';
       return;
     }
     
     isLoading = true;
+    error = '';
     
     try {
-      const newNote: Note = {
-        id: Date.now().toString(), // In real app, this would come from backend
+      const noteData = {
         title: title.trim(),
         content: content.trim(),
         source: source.trim(),
-        created_at: new Date(),
-        updated_at: new Date(),
-        tags: selectedTags,
-        comments: []
+        tag_ids: selectedTags.map(tag => tag.id)
       };
       
-      notes.update(n => [...n, newNote]);
-      
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      await NotesAPI.createNote(noteData);
       goto('/notes');
-    } catch (error) {
-      console.error('Error saving note:', error);
-      alert('Error saving note. Please try again.');
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Error saving note. Please try again.';
+      console.error('Error saving note:', err);
     } finally {
       isLoading = false;
     }
@@ -85,6 +74,13 @@
     </div>
   </div>
   
+  <!-- Error Message -->
+  {#if error}
+    <div class="bg-red-600/20 border border-red-600 text-red-300 px-4 py-3 rounded-lg">
+      {error}
+    </div>
+  {/if}
+  
   <!-- Form -->
   <div class="card p-6 space-y-6">
     <!-- Title -->
@@ -120,7 +116,7 @@
     <!-- Tags -->
     <div class="space-y-2">
       <label class="block text-sm font-medium text-gray-300">Tags</label>
-      <TagSelector bind:selectedTags />
+      <TagSelector bind:selectedTags disabled={isLoading} />
     </div>
     
     <!-- Content -->
@@ -132,4 +128,3 @@
     </div>
   </div>
 </div>
-
