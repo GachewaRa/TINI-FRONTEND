@@ -6,13 +6,16 @@
   import TinyMCEEditor from '$lib/components/TinyMCEEditor.svelte';
   import TagSelector from '$lib/components/TagSelector.svelte';
   import NoteCard from '$lib/components/NoteCard.svelte';
-  import { projects, projectFolders, tags as availableTagsStore, notes as allNotesStore } from '$lib/stores';
-  import type { Project, ProjectFolder, Tag, Note } from '$lib/types';
-  import { get } from 'svelte/store';
+  // Fixed imports - using consistent pattern like in create component
+  import { projectFolders } from '$lib/stores/projectFolders';
+  import { tags } from '$lib/stores/tags';
+  import { projects } from '$lib/stores/projects';
+  import { notes as allNotesStore } from '$lib/stores';
+  import { projectFoldersStore } from '$lib/stores/projectFolders';
+  import { tagsStore } from '$lib/stores/tags';
   import { projectsStore } from '$lib/stores/projects';
-import { ProjectsAPI } from '$lib/api/projects';
-    import { tagsStore } from '$lib/stores/tags';
-    import { projectFoldersStore } from '$lib/stores/projectFolders';
+  import { ProjectsAPI } from '$lib/api/projects';
+  import type { Project, ProjectFolder, Tag, Note } from '$lib/types';
 
   let projectId: string;
   let project: Project | null = null;
@@ -27,7 +30,7 @@ import { ProjectsAPI } from '$lib/api/projects';
 
   let allProjectFolders: ProjectFolder[] = [];
   let allAvailableTags: Tag[] = [];
-  let allNotes: Note[] = []; // To hold all notes for filtering
+  let allNotes: Note[] = [];
 
   // Derived state for related notes
   $: relatedNotes = allNotes.filter(note =>
@@ -40,14 +43,15 @@ import { ProjectsAPI } from '$lib/api/projects';
     { value: 'ARCHIVED', label: 'Archived', description: 'No longer active' }
   ];
 
-  // Subscribe to stores
+  // Subscribe to stores - using consistent pattern
   projectFolders.subscribe(value => {
     allProjectFolders = value;
   });
 
-  availableTagsStore.subscribe(value => {
-    allAvailableTags = value;
-  });
+  // Fixed: Use the derived store consistently
+  $: {
+    allAvailableTags = $tags;
+  }
 
   allNotesStore.subscribe(value => {
     allNotes = value;
@@ -57,9 +61,13 @@ import { ProjectsAPI } from '$lib/api/projects';
     projectId = $page.params.id;
     
     try {
-      // Load the project from API if not in store
-      await projectsStore.load();
-      
+      // Load all required data first - similar to create component
+      await Promise.all([
+        projectFoldersStore.load(),
+        tagsStore.load(),
+        projectsStore.load()
+      ]);
+
       // Find project in store
       const foundProject = $projects.find(p => p.id === projectId);
       
@@ -80,16 +88,10 @@ import { ProjectsAPI } from '$lib/api/projects';
       content = project.content;
       status = project.status;
       
-      // Load folders if needed
-      if (project.folder_id && $projectFolders.length === 0) {
-        await projectFoldersStore.load();
-      }
-      selectedFolder = $projectFolders.find(f => f.id === project.folder_id) || null;
+      // Set selected folder
+      selectedFolder = allProjectFolders.find(f => f.id === project.folder_id) || null;
       
-      // Load tags if needed
-      if (project.tags && $availableTagsStore.length === 0) { 
-        await tagsStore.load();
-      }
+      // Set selected tags
       selectedTags = project.tags || [];
       
     } catch (error) {
@@ -122,20 +124,28 @@ import { ProjectsAPI } from '$lib/api/projects';
         title: title.trim(),
         content: content.trim(),
         status,
-        folder_id: selectedFolder?.id || null,
-        tags: selectedTags.map(t => t.id) // Send just tag IDs
+        folder_id: selectedFolder?.id?.toString() || null,
+        tags: selectedTags.map(t => t.id.toString()) // Ensure string IDs like in create component
       };
 
       // Update via API
       const updatedProject = await ProjectsAPI.updateProject(project.id, updateData);
       
-      
       // Update local project reference
-      project = updatedProject;
+      project = {
+        ...updatedProject,
+        created_at: new Date(updatedProject.created_at),
+        updated_at: new Date(updatedProject.updated_at),
+        tags: updatedProject.tags || [],
+        notes: updatedProject.notes || []
+      };
+
+      // Update the store
+      projectsStore.updateProject(project);
 
     } catch (error) {
       console.error('Error updating project:', error);
-      errors.submit = error.message || 'Failed to update project';
+      errors.submit = error instanceof Error ? error.message : 'Failed to update project';
     } finally {
       isSubmitting = false;
     }
@@ -151,10 +161,11 @@ import { ProjectsAPI } from '$lib/api/projects';
     isSubmitting = true;
     try {
       await ProjectsAPI.deleteProject(project.id);
+      projectsStore.removeProject(project.id);
       goto('/projects');
     } catch (error) {
       console.error('Error deleting project:', error);
-      errors.submit = error.message || 'Failed to delete project';
+      errors.submit = error instanceof Error ? error.message : 'Failed to delete project';
     } finally {
       isSubmitting = false;
     }
@@ -171,7 +182,7 @@ import { ProjectsAPI } from '$lib/api/projects';
       case 'COMPLETED':
         return 'text-blue-400 bg-blue-400/10 border-blue-400/20';
       case 'ARCHIVED':
-      return 'text-gray-400 bg-gray-400/10 border-gray-400/20';
+        return 'text-gray-400 bg-gray-400/10 border-gray-400/20';
       default:
         return 'text-gray-400 bg-gray-400/10 border-gray-400/20';
     }
@@ -214,6 +225,13 @@ import { ProjectsAPI } from '$lib/api/projects';
             Delete Project
           </button>
         {/if}
+        <button
+          type="button"
+          on:click={handleCancel}
+          class="px-4 py-2 text-gray-400 hover:text-gray-200 transition-colors"
+        >
+          Cancel
+        </button>
         <button
           type="button"
           on:click={handleSubmit}
@@ -332,7 +350,14 @@ import { ProjectsAPI } from '$lib/api/projects';
           <label for="tags" class="block text-sm font-medium text-gray-300 mb-2">
             Tags
           </label>
-          <TagSelector bind:selectedTags={selectedTags} availableTags={allAvailableTags} />
+          {#if allAvailableTags.length > 0}
+            <TagSelector 
+              bind:selectedTags={selectedTags} 
+              availableTags={allAvailableTags} 
+            />
+          {:else}
+            <div class="text-sm text-gray-400">Loading tags...</div>
+          {/if}
         </div>
       {/if}
     </div>
@@ -348,7 +373,8 @@ import { ProjectsAPI } from '$lib/api/projects';
       </div>
 
       <div class="space-y-3 max-h-[calc(100vh-160px)] overflow-y-auto">
-        {#if project} {#each relatedNotes as note (note.id)}
+        {#if project} 
+          {#each relatedNotes as note (note.id)}
             <div class="transform scale-90 origin-top-left">
               <NoteCard {note} compact={true} />
             </div>

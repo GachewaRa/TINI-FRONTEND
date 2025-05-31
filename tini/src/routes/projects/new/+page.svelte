@@ -82,7 +82,6 @@
         tags: selectedTags.map(tag => tag.id.toString())
       };
 
-      console.log("PROJECT DATA: ", projectData)
 
       const createdProjectResponse = await ProjectsAPI.createProject(projectData);
 
