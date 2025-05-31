@@ -141,7 +141,7 @@
       };
 
       // Update the store
-      projectsStore.updateProject(project);
+      // projectsStore.updateProject(project);
 
     } catch (error) {
       console.error('Error updating project:', error);
