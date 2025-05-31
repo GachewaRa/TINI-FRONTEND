@@ -129,8 +129,6 @@ import { ProjectsAPI } from '$lib/api/projects';
       // Update via API
       const updatedProject = await ProjectsAPI.updateProject(project.id, updateData);
       
-      // Update local store
-      // projectsStore.updateProject(updatedProject);
       
       // Update local project reference
       project = updatedProject;
@@ -153,7 +151,6 @@ import { ProjectsAPI } from '$lib/api/projects';
     isSubmitting = true;
     try {
       await ProjectsAPI.deleteProject(project.id);
-      ProjectsAPI.deleteProject(project.id);
       goto('/projects');
     } catch (error) {
       console.error('Error deleting project:', error);
