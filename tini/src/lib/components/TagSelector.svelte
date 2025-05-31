@@ -5,7 +5,7 @@
   import type { Tag } from '$lib/types';
   
   export let selectedTags: Tag[] = [];
-  export let availableTags: Tag[] = []; // Add this line
+  export let availableTags: Tag[] = [];
   
   let showTagInput = false;
   let newTagName = '';

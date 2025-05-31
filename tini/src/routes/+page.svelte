@@ -2,7 +2,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { Plus, FileText, Tag, Highlighter, FolderOpen, TrendingUp } from 'lucide-svelte';
-  import { notes, tags, highlights, projects, mockNotes, mockTags } from '$lib/stores';
+  import { notes, tags, highlights, projects} from '$lib/stores';
   
   let stats = {
     totalNotes: 0,
@@ -13,8 +13,8 @@
   
   onMount(() => {
     // Initialize with mock data
-    notes.set(mockNotes);
-    tags.set(mockTags);
+    // notes.set(mockNotes);
+    // tags.set(mockTags);
     
     // Update stats
     notes.subscribe(n => stats.totalNotes = n.length);

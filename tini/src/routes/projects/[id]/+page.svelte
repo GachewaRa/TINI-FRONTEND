@@ -12,6 +12,7 @@
   import { projectsStore } from '$lib/stores/projects';
 import { ProjectsAPI } from '$lib/api/projects';
     import { tagsStore } from '$lib/stores/tags';
+    import { projectFoldersStore } from '$lib/stores/projectFolders';
 
   let projectId: string;
   let project: Project | null = null;

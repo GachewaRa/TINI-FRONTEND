@@ -32,7 +32,7 @@
         source: source.trim(),
         tag_ids: selectedTags.map(tag => tag.id)
       };
-      
+      console.log("NOTE DATA: ", noteData)
       await NotesAPI.createNote(noteData);
       goto('/notes');
     } catch (err) {

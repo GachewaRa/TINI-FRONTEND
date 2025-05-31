@@ -1,11 +1,11 @@
 <!-- src/lib/components/SearchFilter.svelte -->
 <script lang="ts">
   import { Search, X } from 'lucide-svelte';
-  import { searchFilters, tags, mockTags } from '$lib/stores';
+  import { searchFilters, tags} from '$lib/stores';
   import { onMount } from 'svelte';
   
   onMount(() => {
-    tags.set(mockTags);
+    // tags.set(mockTags);
   });
   
   function clearFilters() {
