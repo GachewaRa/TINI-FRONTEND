@@ -6,7 +6,6 @@
   import TinyMCEEditor from '$lib/components/TinyMCEEditor.svelte';
   import TagSelector from '$lib/components/TagSelector.svelte';
   import NoteCard from '$lib/components/NoteCard.svelte';
-  // Fixed imports - using consistent pattern like in create component
   import { projectFolders } from '$lib/stores/projectFolders';
   import { tags } from '$lib/stores/tags';
   import { projects } from '$lib/stores/projects';
@@ -57,48 +56,88 @@
     allNotes = value;
   });
 
+  
+
+  // Update the onMount function to properly resolve tag IDs to tag objects
   onMount(async () => {
-    projectId = $page.params.id;
-    
-    try {
-      // Load all required data first - similar to create component
-      await Promise.all([
-        projectFoldersStore.load(),
-        tagsStore.load(),
-        projectsStore.load()
-      ]);
+      projectId = $page.params.id;
+      try {
+          // Load all required data first
+          await Promise.all([
+              projectFoldersStore.load(),
+              tagsStore.load(),
+              projectsStore.load()
+          ]);
 
-      // Find project in store
-      const foundProject = $projects.find(p => p.id === projectId);
-      
-      if (!foundProject) {
-        // If not in store, try fetching directly
-        const apiProject = await ProjectsAPI.getProject(projectId);
-        project = {
-          ...apiProject,
-          created_at: new Date(apiProject.created_at),
-          updated_at: new Date(apiProject.updated_at)
-        };
-      } else {
-        project = foundProject;
+          // Find project in store
+          const foundProject = $projects.find(p => p.id === projectId);
+          if (!foundProject) {
+              const apiProject = await ProjectsAPI.getProject(projectId);
+              project = {
+                  ...apiProject,
+                  created_at: new Date(apiProject.created_at),
+                  updated_at: new Date(apiProject.updated_at)
+              };
+          } else {
+              project = foundProject;
+          }
+
+          console.log("FOUND PROJECT: ", foundProject);
+          console.log("FOUND PROJECT TAGS: ", project.tags);
+
+          // Initialize form fields
+          title = project.title;
+          content = project.content;
+          status = project.status;
+          selectedFolder = allProjectFolders.find(f => f.id === project.folder_id) || null;
+          
+          // FIXED: Properly resolve tag IDs to full tag objects
+          if (project.tags && project.tags.length > 0) {
+              console.log("🔍 Edit Project - Raw project.tags:", project.tags);
+              console.log("🔍 Edit Project - Available tags from store:", $tags);
+              
+              // If project.tags contains strings (IDs), resolve them to full tag objects
+              if (typeof project.tags[0] === 'string') {
+                  selectedTags = project.tags
+                      .map(tagId => {
+                          const foundTag = $tags.find(tag => tag.id === tagId);
+                          if (foundTag) {
+                              console.log("✅ Edit Project - Resolved tag:", { id: foundTag.id, name: foundTag.name, color: foundTag.color });
+                              return foundTag;
+                          } else {
+                              console.warn("⚠️ Edit Project - Tag not found for ID:", tagId);
+                              return null;
+                          }
+                      })
+                      .filter(tag => tag !== null); // Remove any null entries
+              } else {
+                  // If project.tags already contains full objects, use them directly
+                  selectedTags = [...project.tags];
+              }
+              
+              console.log("🏷️ Edit Project - Final selectedTags:", selectedTags.map(t => ({ id: t.id, name: t.name, color: t.color })));
+          } else {
+              selectedTags = [];
+              console.log("🏷️ Edit Project - No tags found for project");
+          }
+          
+      } catch (error) {
+          console.error('Failed to load project:', error);
+          goto('/projects');
       }
-
-      // Initialize form fields
-      title = project.title;
-      content = project.content;
-      status = project.status;
-      
-      // Set selected folder
-      selectedFolder = allProjectFolders.find(f => f.id === project.folder_id) || null;
-      
-      // Set selected tags
-      selectedTags = project.tags || [];
-      
-    } catch (error) {
-      console.error('Failed to load project:', error);
-      goto('/projects');
-    }
   });
+
+  // Also add a reactive statement to help debug when tags change
+  $: {
+      if (selectedTags.length > 0) {
+          console.log("🔄 Edit Project - selectedTags updated:", selectedTags.map(t => ({ 
+              id: t.id, 
+              name: t.name, 
+              color: t.color,
+              hasAllProperties: !!(t.id && t.name && t.color)
+          })));
+      }
+  }
 
   function validateForm(): boolean {
     errors = {};
