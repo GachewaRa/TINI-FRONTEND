@@ -83,9 +83,9 @@
         title: title.trim(),
         content: content.trim(),
         source: source.trim(),
-        tag_ids: selectedTags.map(tag => tag.id)
+        tags: selectedTags.map(tag => tag.name)
       };
-      
+      console.log("NOTEDATA SENT FOR UPDATING: ", noteData)
       await NotesAPI.updateNote(noteId, noteData);
       goto(`/notes/${noteId}`);
     } catch (err) {

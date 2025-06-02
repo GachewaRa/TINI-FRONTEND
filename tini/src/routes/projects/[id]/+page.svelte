@@ -81,6 +81,7 @@
         } else {
             project = foundProject;
         }
+        console.log("FOUND PROJECT:", foundProject)
 
         // Initialize form fields
         title = project.title;

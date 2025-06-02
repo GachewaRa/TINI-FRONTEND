@@ -17,7 +17,7 @@ let isCreatingTag = false;
 $: filteredAvailableTags = availableTags.filter(tag => 
     !selectedTags.find(st => st.id === tag.id)
 );
-
+console.log("SELECTED TAGS:", selectedTags)
 // Log changes for tracking with more detailed info
 $: {
     // Check for invalid tags

@@ -24,6 +24,7 @@
       isLoading = true;
       error = '';
       note = await NotesAPI.getNote(noteId);
+      console.log("LOADED NOTE: ", note)
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load note';
       console.error('Error loading note:', err);

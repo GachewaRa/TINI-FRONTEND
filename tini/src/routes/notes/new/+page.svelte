@@ -36,7 +36,7 @@
         title: title.trim(),
         content: content.trim(),
         source: source.trim(),
-        tag_ids: selectedTags.map(tag => tag.id)
+        tags: selectedTags.map(tag => tag.name)
       };
       console.log("NOTE DATA: ", noteData)
       await NotesAPI.createNote(noteData);
