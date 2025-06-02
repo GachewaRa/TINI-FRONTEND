@@ -150,10 +150,8 @@
     // Re-enable selection handling after a brief delay
     setTimeout(() => {
       document.addEventListener('selectionchange', handleSelectionChangeDebounced);
-      console.log('Selection handling re-enabled');
     }, 100);
     
-    console.log('Modal closed and selection cleared');
   }
   
   function goBack() {
@@ -169,7 +167,6 @@
     if (highlightContentElement && !highlightContentElement.contains(target)) {
       // Clicked outside content area
       if (selectedText) {
-        console.log('Clicked outside content, clearing selection');
         selectedText = '';
         try {
           window.getSelection()?.removeAllRanges();

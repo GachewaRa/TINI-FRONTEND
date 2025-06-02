@@ -82,9 +82,6 @@
             project = foundProject;
         }
 
-        // console.log("FOUND PROJECT: ", project);
-        // console.log("FOUND PROJECT TAGS: ", project.tags);
-
         // Initialize form fields
         title = project.title;
         content = project.content;
@@ -93,8 +90,7 @@
         
         // Updated: Handle tag names instead of IDs
         if (project.tags && project.tags.length > 0) {
-            // console.log("🔍 Edit Project - Raw project.tags:", project.tags);
-            // console.log("🔍 Edit Project - Available tags from store:", $tags);
+ 
             
             // Resolve tag names to full tag objects
             selectedTags = project.tags
@@ -109,11 +105,7 @@
                 })
                 .filter(tag => tag !== null); // Remove any null entries
             
-            // console.log("🏷️ Edit Project - Final selectedTags:", selectedTags.map(t => ({ 
-            //     id: t.id, 
-            //     name: t.name, 
-            //     color: t.color 
-            // })));
+           
         } else {
             selectedTags = [];
         }
@@ -127,12 +119,7 @@
   // Also add a reactive statement to help debug when tags change
   $: {
       if (selectedTags.length > 0) {
-          // console.log("🔄 Edit Project - selectedTags updated:", selectedTags.map(t => ({ 
-          //     id: t.id, 
-          //     name: t.name, 
-          //     color: t.color,
-          //     hasAllProperties: !!(t.id && t.name && t.color)
-          // })));
+          
       }
   }
 

@@ -1,19 +1,18 @@
-<!-- src/lib/components/CreateNoteModal.svelte -->
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
   import { X, Save } from 'lucide-svelte';
   import TagSelector from './TagSelector.svelte';
-  import type { Note, Tag } from '$lib/types';
-    import { NotesAPI } from '$lib/api/notes';
+  import type { Note, Tag, NoteCreate } from '$lib/types';
+  import { NotesAPI } from '$lib/api/notes';
+  import { tags, tagsStore } from '$lib/stores/tags';
   
-  // Props
   export let selectedText: string = '';
   export let source: string = '';
   export let highlightId: string = '';
   
-  // Local state
   let title = '';
   let selectedTags: Tag[] = [];
+  let allAvailableTags: Tag[] = [];
   let isLoading = false;
   let modalElement: HTMLElement;
   let titleInput: HTMLInputElement;
@@ -23,159 +22,84 @@
     close: void;
   }>();
   
-  console.log('CreateNoteModal initialized with:', {
-    selectedText,
-    source,
-    highlightId
-  });
-  
-  onMount(() => {
-    console.log('Modal mounted, setting up focus and event handling');
+  // Load tags when component mounts
+  onMount(async () => {
+    try {
+      await tagsStore.load();
+    } catch (err) {
+      console.error('Failed to load tags:', err);
+    }
     
-    // Focus the title input after a brief delay to ensure modal is rendered
-    setTimeout(() => {
-      if (titleInput) {
-        titleInput.focus();
-        console.log('Title input focused');
-      }
-    }, 100);
+    // Focus the title input
+    setTimeout(() => titleInput?.focus(), 100);
     
-    // Handle escape key to close modal
     function handleKeydown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        console.log('Escape key pressed, closing modal');
-        closeModal();
-      }
+      if (event.key === 'Escape') closeModal();
     }
     
     document.addEventListener('keydown', handleKeydown);
-    
-    return () => {
-      console.log('Modal unmounting, cleaning up event listeners');
-      document.removeEventListener('keydown', handleKeydown);
-    };
+    return () => document.removeEventListener('keydown', handleKeydown);
   });
   
+  // Update available tags when store changes
+  $: {
+    allAvailableTags = $tags;
+  }
+  
   function closeModal() {
-    console.log('Closing modal');
     title = '';
     selectedTags = [];
     dispatch('close');
   }
   
-  function handleBackdropClick(event: MouseEvent) {
-    // Only close if clicking the backdrop itself, not its children
-    if (event.target === event.currentTarget) {
-      console.log('Backdrop clicked, closing modal');
-      closeModal();
-    }
-  }
-  
-  function handleModalClick(event: MouseEvent) {
-    // Prevent event bubbling to backdrop
-    event.stopPropagation();
-    console.log('Modal content clicked, preventing backdrop close');
-  }
-  
   async function createNote() {
-    console.log('Create note function called');
-    console.log('Current form state:', {
-      title: title.trim(),
-      selectedText,
-      source,
-      highlightId,
-      selectedTags
-    });
-    
     if (!title.trim()) {
-      console.warn('No title provided');
       alert('Please enter a title for the note');
-      
-      // Refocus the title input
-      if (titleInput) {
-        titleInput.focus();
-      }
+      titleInput?.focus();
       return;
     }
     
     isLoading = true;
-    console.log('Starting note creation...');
     
     try {
-      const newNote: Note = {
-        // id: Date.now().toString(),
+      const noteData: NoteCreate = {
         title: title.trim(),
         content: selectedText,
         source: source,
         highlights_id: highlightId,
-        created_at: new Date(),
-        updated_at: new Date(),
-        tags: selectedTags,
-        comments: []
+        tags: selectedTags.map(tag => tag.id.toString()) // Convert tags to IDs
       };
-      
-      console.log('Created new note object:', newNote);
-      
-      await NotesAPI.createNote(newNote);
-      
-      console.log('Dispatching noteCreated event');
-      dispatch('noteCreated', newNote);
+
+      console.log("NOTE DATA TO BACKEND: ", noteData)
+
+      const createdNote = await NotesAPI.createNote(noteData);
       
       // Reset form
       title = '';
       selectedTags = [];
       
+      dispatch('noteCreated', createdNote);
+      closeModal();
     } catch (error) {
       console.error('Error creating note:', error);
       alert('Error creating note. Please try again.');
     } finally {
       isLoading = false;
-      console.log('Note creation process completed');
     }
-  }
-  
-  function handleTitleInput(event: Event) {
-    const target = event.target as HTMLInputElement;
-    title = target.value;
-    console.log('Title input changed:', title);
-  }
-  
-  function handleTitleKeydown(event: KeyboardEvent) {
-    console.log('Title input keydown:', event.key);
-    
-    // Handle Enter key to submit form
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
-      if (title.trim()) {
-        createNote();
-      }
-    }
-  }
-  
-  // Log when props change
-  $: {
-    console.log('Props updated:', { selectedText, source, highlightId });
   }
 </script>
 
 <!-- Modal Backdrop -->
 <div 
-  class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-  on:click={handleBackdropClick}
+  class="fixed inset-0 bg-black bg-opacity-20 flex items-center justify-center z-50"
+  on:click|self={closeModal}
   bind:this={modalElement}
 >
-  <div 
-    class="bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4"
-    on:click={handleModalClick}
-  >
+  <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
     <!-- Header -->
     <div class="flex items-center justify-between mb-4">
       <h3 class="text-lg font-semibold text-gray-200">Create Note from Selection</h3>
-      <button
-        on:click={closeModal}
-        class="text-gray-400 hover:text-white transition-colors"
-        disabled={isLoading}
-      >
+      <button on:click={closeModal} class="text-gray-400 hover:text-white">
         <X class="w-5 h-5" />
       </button>
     </div>
@@ -200,35 +124,35 @@
     
     <!-- Title Input -->
     <div class="mb-4">
-      <label for="note-title" class="block text-sm font-medium text-gray-300 mb-2">
+      <label class="block text-sm font-medium text-gray-300 mb-2">
         Note Title <span class="text-red-400">*</span>
       </label>
       <input
         bind:this={titleInput}
-        id="note-title"
-        type="text"
-        value={title}
-        on:input={handleTitleInput}
-        on:keydown={handleTitleKeydown}
+        bind:value={title}
         placeholder="Enter note title..."
-        class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-600 focus:border-transparent"
+        class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:ring-2 focus:ring-yellow-600"
+        on:keydown={(e) => e.key === 'Enter' && createNote()}
         disabled={isLoading}
       />
     </div>
     
-    <!-- Tags -->
+    <!-- Tags Section - Matches Project Creator -->
     <div class="mb-6">
       <label class="block text-sm font-medium text-gray-300 mb-2">Tags</label>
-      <TagSelector bind:selectedTags />
+      {#if allAvailableTags.length > 0}
+        <TagSelector 
+          bind:selectedTags={selectedTags} 
+          availableTags={allAvailableTags} 
+        />
+      {:else}
+        <div class="text-sm text-gray-400">Loading tags...</div>
+      {/if}
     </div>
     
     <!-- Actions -->
     <div class="flex justify-end space-x-3">
-      <button
-        on:click={closeModal}
-        class="px-4 py-2 text-gray-400 hover:text-white transition-colors"
-        disabled={isLoading}
-      >
+      <button on:click={closeModal} class="px-4 py-2 text-gray-400 hover:text-white">
         Cancel
       </button>
       <button
