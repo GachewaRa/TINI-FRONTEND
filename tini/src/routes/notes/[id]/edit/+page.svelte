@@ -47,13 +47,21 @@
       
       // Handle tags properly - similar to your project component
       if (note.tags && note.tags.length > 0) {
-        // If your API returns tag objects, use them directly
-        selectedTags = note.tags;
+
+
+    // Resolve tag names to full tag objects
+        selectedTags = note.tags
+            .map(tagName => {
+                const foundTag = $tags.find(tag => tag.name === tagName);
+                if (foundTag) {
+                    return foundTag;
+                } else {
+                    console.warn("⚠️ Edit Project - Tag not found for name:", tagName);
+                    return null;
+                }
+            })
+            .filter(tag => tag !== null); // Remove any null entries
         
-        // If your API returns tag IDs or names, resolve them like in your project component:
-        // selectedTags = note.tags
-        //   .map(tagId => allAvailableTags.find(tag => tag.id === tagId))
-        //   .filter(tag => tag !== null);
       } else {
         selectedTags = [];
       }
