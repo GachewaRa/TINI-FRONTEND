@@ -6,6 +6,7 @@
   import { Edit, Trash2, MessageCircle, ArrowLeft, FolderOpen, FileText } from 'lucide-svelte';
   import { NotesAPI } from '$lib/api/notes';
   import type { Note } from '$lib/types';
+  import { tags } from '$lib/stores/tags';
   
   let note: Note | null = null;
   let isLoading = true;
@@ -15,6 +16,12 @@
   
   $: noteId = $page.params.id;
   
+  // Add this reactive statement to resolve tag names to full tag objects
+  $: resolvedTags = note?.tags ? note.tags.map(tagName => {
+    const fullTag = $tags.find(tag => tag.name === tagName);
+    return fullTag || { name: tagName, color: '#6B7280' }; // fallback color
+  }) : [];
+
   onMount(async () => {
     await loadNote();
   });
@@ -122,11 +129,15 @@
     </div>
     
    <!-- Tags -->
-    {#if note.tags && note.tags.length > 0}
+    <!-- Then update the tags section -->
+    {#if resolvedTags.length > 0}
       <div class="flex flex-wrap gap-2">
-        {#each note.tags as tagName}
-          <span class="px-3 py-1 rounded-full text-sm font-medium bg-gray-700 text-gray-200 border border-gray-600">
-            {tagName}
+        {#each resolvedTags as tag}
+          <span 
+            class="px-3 py-1 rounded-full text-sm font-medium"
+            style="background-color: {tag.color}20; color: {tag.color}; border: 1px solid {tag.color}"
+          >
+            {tag.name}
           </span>
         {/each}
       </div>
