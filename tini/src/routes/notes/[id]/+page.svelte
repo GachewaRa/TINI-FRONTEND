@@ -55,6 +55,7 @@
   function goBack() {
     goto('/notes');
   }
+  
 </script>
 
 <svelte:head>
@@ -120,15 +121,12 @@
       </div>
     </div>
     
-    <!-- Tags -->
+   <!-- Tags -->
     {#if note.tags && note.tags.length > 0}
       <div class="flex flex-wrap gap-2">
-        {#each note.tags as tag}
-          <span 
-            class="px-3 py-1 rounded-full text-sm font-medium"
-            style="background-color: {tag.color}20; color: {tag.color}; border: 1px solid {tag.color}"
-          >
-            {tag.name}
+        {#each note.tags as tagName}
+          <span class="px-3 py-1 rounded-full text-sm font-medium bg-gray-700 text-gray-200 border border-gray-600">
+            {tagName}
           </span>
         {/each}
       </div>

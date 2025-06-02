@@ -39,7 +39,7 @@
       isLoadingNote = true;
       error = '';
       note = await NotesAPI.getNote(noteId);
-      
+      console.log("NOTE FROM EDIT:", note)
       // Populate form fields
       title = note.title;
       content = note.content;
