@@ -7,6 +7,8 @@
   import { NotesAPI } from '$lib/api/notes';
   import type { Tag } from '$lib/types';
   import { tags } from '$lib/stores/tags';
+  import { onMount } from 'svelte';
+  import { tagsStore } from '$lib/stores/tags';
   
   let title = '';
   let content = '';
@@ -15,6 +17,10 @@
   let allAvailableTags: Tag[] = [];
   let isLoading = false;
   let error = '';
+
+  onMount(async () => {
+    await tagsStore.load();
+  });
   
   async function saveNote() {
     if (!title.trim() || !content.trim() || !source.trim()) {
@@ -43,7 +49,9 @@
     }
   }
   
-  $: allAvailableTags = $tags;
+  tags.subscribe(value => {
+    allAvailableTags = value;
+  });
 
   function cancel() {
     goto('/notes');
