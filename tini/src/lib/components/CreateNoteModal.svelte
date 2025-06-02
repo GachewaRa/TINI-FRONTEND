@@ -4,6 +4,7 @@
   import { X, Save } from 'lucide-svelte';
   import TagSelector from './TagSelector.svelte';
   import type { Note, Tag } from '$lib/types';
+    import { NotesAPI } from '$lib/api/notes';
   
   // Props
   export let selectedText: string = '';
@@ -102,7 +103,7 @@
     
     try {
       const newNote: Note = {
-        id: Date.now().toString(),
+        // id: Date.now().toString(),
         title: title.trim(),
         content: selectedText,
         source: source,
@@ -115,8 +116,7 @@
       
       console.log('Created new note object:', newNote);
       
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await NotesAPI.createNote(newNote);
       
       console.log('Dispatching noteCreated event');
       dispatch('noteCreated', newNote);
