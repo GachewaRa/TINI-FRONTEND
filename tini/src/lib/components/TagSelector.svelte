@@ -20,16 +20,6 @@ $: filteredAvailableTags = availableTags.filter(tag =>
 
 // Log changes for tracking with more detailed info
 $: {
-    console.log('🏷️ TagSelector - Current selectedTags:', selectedTags.map(t => ({ 
-        id: t?.id, 
-        name: t?.name, 
-        color: t?.color,
-        isValid: !!(t?.id && t?.name && t?.color),
-        fullObject: t
-    })));
-    console.log('🏷️ TagSelector - Available tags count:', availableTags.length);
-    console.log('🏷️ TagSelector - Filtered available tags count:', filteredAvailableTags.length);
-    
     // Check for invalid tags
     const invalidTags = selectedTags.filter(t => !t?.id || !t?.name);
     if (invalidTags.length > 0) {
@@ -39,26 +29,24 @@ $: {
 
 function addTag(tag: Tag) {
     if (!selectedTags.find(t => t.id === tag.id)) {
-        console.log('➕ TagSelector - Adding tag:', { id: tag.id, name: tag.name, color: tag.color });
         selectedTags = [...selectedTags, tag];
-        console.log('➕ TagSelector - Selected tags after addition:', selectedTags.map(t => ({ id: t.id, name: t.name })));
     } else {
-        console.log('⚠️ TagSelector - Tag already selected:', { id: tag.id, name: tag.name });
+        // console.log('⚠️ TagSelector - Tag already selected:', { id: tag.id, name: tag.name });
     }
 }
 
 function removeTag(tagId: string) {
     const tagToRemove = selectedTags.find(t => t.id === tagId);
-    console.log('➖ TagSelector - Removing tag:', tagToRemove ? { id: tagToRemove.id, name: tagToRemove.name } : 'Tag not found');
+    // console.log('➖ TagSelector - Removing tag:', tagToRemove ? { id: tagToRemove.id, name: tagToRemove.name } : 'Tag not found');
     selectedTags = selectedTags.filter(t => t.id !== tagId);
-    console.log('➖ TagSelector - Selected tags after removal:', selectedTags.map(t => ({ id: t.id, name: t.name })));
+    // console.log('➖ TagSelector - Selected tags after removal:', selectedTags.map(t => ({ id: t.id, name: t.name })));
 }
 
 async function createNewTag() {
     if (!newTagName.trim() || isCreatingTag) return;
     
     isCreatingTag = true;
-    console.log('🆕 TagSelector - Creating new tag:', { name: newTagName.trim(), color: newTagColor });
+    // console.log('🆕 TagSelector - Creating new tag:', { name: newTagName.trim(), color: newTagColor });
     
     try {
         const tagData = {
@@ -68,17 +56,14 @@ async function createNewTag() {
             parent_id: undefined // TagSelector doesn't handle parent tags
         };
         
-        console.log('🆕 TagSelector - Sending tag data to API:', tagData);
+        // console.log('🆕 TagSelector - Sending tag data to API:', tagData);
         
         // Use the tagsStore.addTag method which returns the newly created tag
         const newTag = await tagsStore.addTag(tagData);
         
-        console.log('✅ TagSelector - Tag created successfully:', { id: newTag.id, name: newTag.name, color: newTag.color });
-        console.log('✅ TagSelector - Full created tag object:', newTag);
         
         // Add the newly created tag to selectedTags
         selectedTags = [...selectedTags, newTag];
-        console.log('✅ TagSelector - Selected tags after adding new tag:', selectedTags.map(t => ({ id: t.id, name: t.name })));
         
         // Reset form
         newTagName = '';

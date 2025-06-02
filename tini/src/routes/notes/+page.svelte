@@ -6,7 +6,7 @@
   import SearchFilter from '$lib/components/SearchFilter.svelte';
   import { notes, searchFilters } from '$lib/stores';
   import { NotesAPI } from '$lib/api/notes';
-  import type { Note, Project, Matter } from '$lib/types';
+  import type { Note, Project} from '$lib/types';
   
   let filteredNotes: Note[] = [];
   let showFilters = false;
@@ -16,7 +16,7 @@
   
   // Project/Matter linking
   let availableProjects: Project[] = [];
-  let availableMatters: Matter[] = [];
+  // let availableMatters: Matter[] = [];
   let showProjectDropdown = false;
   let showMatterDropdown = false;
   let isLinkingToProject = false;
@@ -24,7 +24,7 @@
   
   onMount(async () => {
     await loadNotes();
-    await loadProjectsAndMatters();
+    // await loadProjectsAndMatters();
   });
   
   async function loadNotes() {
@@ -41,16 +41,16 @@
     }
   }
   
-  async function loadProjectsAndMatters() {
-    try {
-      [availableProjects, availableMatters] = await Promise.all([
-        NotesAPI.getProjects(),
-        // NotesAPI.getMatters()
-      ]);
-    } catch (err) {
-      console.error('Error loading projects/matters:', err);
-    }
-  }
+  // async function loadProjectsAndMatters() {
+  //   try {
+  //     [availableProjects, availableMatters] = await Promise.all([
+  //       NotesAPI.getProjects(),
+  //       // NotesAPI.getMatters()
+  //     ]);
+  //   } catch (err) {
+  //     console.error('Error loading projects/matters:', err);
+  //   }
+  // }
   
   function toggleNoteSelection(noteId: string) {
     if (selectedNotes.has(noteId)) {
