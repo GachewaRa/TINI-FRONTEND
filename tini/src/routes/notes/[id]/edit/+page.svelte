@@ -9,6 +9,7 @@
   import { NotesAPI } from '$lib/api/notes';
   import type { Note, Tag, Comment } from '$lib/types';
   import { tags } from '$lib/stores/tags';
+  import { tagsStore } from '$lib/stores/tags';
   
   let note: Note | null = null;
   let title = '';
@@ -29,6 +30,7 @@
   $: allAvailableTags = $tags;
   
   onMount(async () => {
+    await tagsStore.load();
     await loadNote();
   });
   
@@ -42,7 +44,19 @@
       title = note.title;
       content = note.content;
       source = note.source;
-      selectedTags = note.tags || [];
+      
+      // Handle tags properly - similar to your project component
+      if (note.tags && note.tags.length > 0) {
+        // If your API returns tag objects, use them directly
+        selectedTags = note.tags;
+        
+        // If your API returns tag IDs or names, resolve them like in your project component:
+        // selectedTags = note.tags
+        //   .map(tagId => allAvailableTags.find(tag => tag.id === tagId))
+        //   .filter(tag => tag !== null);
+      } else {
+        selectedTags = [];
+      }
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load note';
       console.error('Error loading note:', err);
@@ -50,6 +64,10 @@
       isLoadingNote = false;
     }
   }
+
+  tags.subscribe(value => {
+    allAvailableTags = value;
+  });
   
   async function saveNote() {
     if (!title.trim() || !content.trim() || !source.trim()) {
