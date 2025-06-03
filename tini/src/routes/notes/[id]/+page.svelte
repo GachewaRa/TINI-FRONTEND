@@ -7,6 +7,7 @@
   import { NotesAPI } from '$lib/api/notes';
   import type { Note } from '$lib/types';
   import { tags } from '$lib/stores/tags';
+  import { tagsStore } from '$lib/stores/tags';
   
   let note: Note | null = null;
   let isLoading = true;
@@ -16,15 +17,16 @@
   
   $: noteId = $page.params.id;
   
-  // Add this reactive statement to resolve tag names to full tag objects
-  $: resolvedTags = note?.tags ? note.tags.map(tagName => {
-    const fullTag = $tags.find(tag => tag.name === tagName);
-    return fullTag || { name: tagName, color: '#6B7280' }; // fallback color
-  }) : [];
-
   onMount(async () => {
+    await tagsStore.load();
     await loadNote();
   });
+
+  $: resolvedTags = note?.tags ? note.tags.map(tagName => {
+    const normalizedTagName = tagName.trim().toLowerCase();
+    const fullTag = $tags.find(tag => tag.name.trim().toLowerCase() === normalizedTagName);
+    return fullTag || { name: tagName, color: '#6B7280' };
+  }) : [];
   
   async function loadNote() {
     try {
