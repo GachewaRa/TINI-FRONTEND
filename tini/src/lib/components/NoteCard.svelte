@@ -3,11 +3,19 @@
   import { createEventDispatcher } from 'svelte';
   import { Calendar, Tag, MessageCircle, FolderOpen, FileText } from 'lucide-svelte';
   import type { Note } from '$lib/types';
-  
+  import { tags } from '$lib/stores/tags'; 
+
   export let note: Note;
   export let isSelected = false;
   
   const dispatch = createEventDispatcher();
+
+  // Add this reactive statement to resolve tag names to full tag objects
+  $: resolvedTags = note?.tags ? note.tags.map(tagName => {
+    const normalizedTagName = tagName.trim().toLowerCase();
+    const fullTag = $tags.find(tag => tag.name.trim().toLowerCase() === normalizedTagName);
+    return fullTag || { name: tagName, color: '#6B7280' }; // fallback color
+  }) : [];
   
   function handleCardClick(event: Event) {
     // If clicking on the selection checkbox area, handle selection
@@ -75,10 +83,10 @@
       {truncateContent(note.content)}
     </div>
     
-    <!-- Tags -->
-    {#if note.tags && note.tags.length > 0}
+    <!-- Update the Tags section to use resolvedTags instead of note.tags -->
+    {#if resolvedTags.length > 0}
       <div class="flex flex-wrap gap-1">
-        {#each note.tags.slice(0, 3) as tag}
+        {#each resolvedTags.slice(0, 3) as tag}
           <span 
             class="px-2 py-1 rounded-full text-xs font-medium"
             style="background-color: {tag.color}20; color: {tag.color}; border: 1px solid {tag.color}"
@@ -86,9 +94,9 @@
             {tag.name}
           </span>
         {/each}
-        {#if note.tags.length > 3}
+        {#if resolvedTags.length > 3}
           <span class="px-2 py-1 rounded-full text-xs font-medium bg-gray-700 text-gray-400">
-            +{note.tags.length - 3} more
+            +{resolvedTags.length - 3} more
           </span>
         {/if}
       </div>

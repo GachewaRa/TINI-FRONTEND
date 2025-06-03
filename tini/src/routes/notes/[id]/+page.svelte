@@ -131,7 +131,6 @@
     </div>
     
    <!-- Tags -->
-    <!-- Then update the tags section -->
     {#if resolvedTags.length > 0}
       <div class="flex flex-wrap gap-2">
         {#each resolvedTags as tag}
