@@ -67,7 +67,7 @@
         content: selectedText,
         source: source,
         highlights_id: highlightId,
-        tags: selectedTags.map(tag => tag.id.toString()) // Convert tags to IDs
+        tags: selectedTags.map(tag => tag.name.toString()) // Convert tags to IDs
       };
 
       console.log("NOTE DATA TO BACKEND: ", noteData)
