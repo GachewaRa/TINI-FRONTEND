@@ -20,7 +20,9 @@
       isLoading = true;
       error = '';
       const data = await fetchHighlights();
+       console.log("ALL HIGHLIGHTS", data)
       highlights.set(data);
+      
     } catch (err) {
       console.error('Error loading highlights:', err);
       error = err instanceof Error ? err.message : 'Failed to load highlights';
@@ -37,7 +39,7 @@
   $: {
     filteredHighlights = $highlights.filter(highlight => {
       if (!searchTerm) return true;
-      
+     
       const term = searchTerm.toLowerCase();
       return (
         highlight.book_title.toLowerCase().includes(term) ||

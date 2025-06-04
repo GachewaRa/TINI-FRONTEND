@@ -155,7 +155,7 @@
 
       // Update via API
       const updatedProject = await ProjectsAPI.updateProject(project.id, updateData);
-      
+      console.log("UPDATED PROJECT OBJECT: ", updatedProject)
       // Update local project reference
       project = {
         ...updatedProject,

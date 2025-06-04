@@ -20,17 +20,14 @@
   
   // Find the highlight
   $: highlight = $highlights.find(h => h.id === highlightId);
-  
+
   // Find notes created from this highlight
-  $: relatedNotes = $notes.filter(note => note.highlights_id === highlightId);
+  $: relatedNotes = highlight?.notes_from_highlight || [];
   
   onMount(() => {
-    console.log('Component mounted, setting up text selection handling');
-    // Set up text selection handling with debounce
     document.addEventListener('selectionchange', handleSelectionChangeDebounced);
     
     return () => {
-      console.log('Component unmounting, cleaning up event listeners');
       document.removeEventListener('selectionchange', handleSelectionChangeDebounced);
       if (selectionTimeout) {
         clearTimeout(selectionTimeout);
@@ -104,9 +101,9 @@
   }
   
   function handleCreateNote() {
-    console.log('Create note button clicked');
-    console.log('Selected text:', selectedText);
-    console.log('Highlight:', highlight);
+    // console.log('Create note button clicked');
+    // console.log('Selected text:', selectedText);
+    // console.log('Highlight:', highlight);
     
     if (selectedText && highlight) {
       console.log('Opening create note modal');
