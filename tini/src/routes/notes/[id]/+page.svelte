@@ -8,18 +8,26 @@
   import type { Note } from '$lib/types';
   import { tags } from '$lib/stores/tags';
   import { tagsStore } from '$lib/stores/tags';
+  import { projectsStore } from '$lib/stores/projects';
+  import { ProjectsAPI } from '$lib/api/projects';
   
   let note: Note | null = null;
   let isLoading = true;
   let isDeleting = false;
   let error = '';
   let showComments = false;
+
+  let showAddToProject = false;
+  let selectedProjectId = '';
+  let isAddingToProject = false;
+  let addToProjectError = '';
   
   $: noteId = $page.params.id;
   
   onMount(async () => {
     await tagsStore.load();
     await loadNote();
+    await projectsStore.load();
   });
 
   $: resolvedTags = note?.tags ? note.tags.map(tagName => {
@@ -58,6 +66,25 @@
       console.error('Error deleting note:', err);
       alert('Failed to delete note');
       isDeleting = false;
+    }
+  }
+
+  async function addToProject() {
+    if (!selectedProjectId) return;
+    
+    isAddingToProject = true;
+    addToProjectError = '';
+    
+    try {
+      await ProjectsAPI.addNoteToProject(selectedProjectId, noteId);
+      // Refresh the note to show the new association
+      await loadNote();
+      showAddToProject = false;
+    } catch (err) {
+      console.error('Error adding note to project:', err);
+      addToProjectError = err instanceof Error ? err.message : 'Failed to add note to project';
+    } finally {
+      isAddingToProject = false;
     }
   }
   
@@ -101,13 +128,22 @@
         </div>
       </div>
       
-      <div class="flex items-center space-x-3">
+      <!-- Update your existing button group div -->
+      <div class="flex items-center space-x-3 relative"> <!-- Added relative for dropdown positioning -->
         <button
           on:click={() => showComments = !showComments}
           class="btn-secondary flex items-center space-x-2"
         >
           <MessageCircle class="w-4 h-4" />
           <span>Comments ({note.comments?.length || 0})</span>
+        </button>
+        
+        <button
+          on:click={() => showAddToProject = !showAddToProject}
+          class="btn-primary flex items-center space-x-2"
+        >
+          <FolderOpen class="w-4 h-4" />
+          <span>Add to Project</span>
         </button>
         
         <button
@@ -128,6 +164,7 @@
           <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
         </button>
       </div>
+        
     </div>
     
    <!-- Tags -->
@@ -236,5 +273,51 @@
     <button on:click={goBack} class="btn-primary mt-4">
       Go Back to Notes
     </button>
+  </div>
+{/if}
+
+<!-- Add this modal/dropdown somewhere appropriate in your template -->
+{#if showAddToProject}
+  <div class="absolute right-0 mt-2 w-64 bg-gray-800 rounded-lg shadow-lg z-10 border border-gray-700">
+    <div class="p-4">
+      <h3 class="font-medium text-gray-200 mb-2">Add to Project</h3>
+      
+      {#if $projectsStore.isLoading}
+        <div class="text-center py-2">
+          <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-yellow-600 mx-auto"></div>
+        </div>
+      {:else}
+        <select
+          bind:value={selectedProjectId}
+          class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-200 mb-3"
+        >
+          <option value="">Select a project</option>
+          {#each $projectsStore.projects.filter(p => p.status === 'ACTIVE') as project}
+            <option value={project.id}>{project.title}</option>
+          {/each}
+        </select>
+        
+        {#if addToProjectError}
+          <p class="text-red-400 text-sm mb-2">{addToProjectError}</p>
+        {/if}
+        
+        <div class="flex justify-end space-x-2">
+          <button
+            on:click={() => showAddToProject = false}
+            class="btn-secondary text-sm px-3 py-1"
+          >
+            Cancel
+          </button>
+          <button
+            on:click={addToProject}
+            disabled={!selectedProjectId || isAddingToProject}
+            class="btn-primary text-sm px-3 py-1"
+            class:opacity-50={!selectedProjectId || isAddingToProject}
+          >
+            {isAddingToProject ? 'Adding...' : 'Add'}
+          </button>
+        </div>
+      {/if}
+    </div>
   </div>
 {/if}

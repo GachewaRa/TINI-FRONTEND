@@ -65,4 +65,13 @@ export class ProjectsAPI {
       apiClient.delete<void>(`${this.BASE_PATH}/${projectId}`)
     );
   }
+
+  static async addNoteToProject(projectId: string, noteId: string): Promise<void> {
+    return withLoading(
+      apiClient.post<void>( // Specify <void> as the expected return type from the API response data
+        `${this.BASE_PATH}/${projectId}/notes`,
+        { note_id: noteId }
+      )
+    );
+  }
 }

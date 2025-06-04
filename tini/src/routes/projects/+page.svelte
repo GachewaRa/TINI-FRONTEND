@@ -54,7 +54,6 @@
           project.content.toLowerCase().includes(term);
         if (!matchesText) return false;
       }
-      
       // Folder filter
       if (selectedFolder && project.folder_id !== selectedFolder.id) {
         return false;
@@ -210,7 +209,6 @@
   </div>
 
 
-  <!-- Add this section to your existing projects page after the search filters -->
   <!-- Active filters display -->
   {#if selectedFolder || selectedTags.length > 0}
     <div class="flex flex-wrap items-center gap-2 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
@@ -313,7 +311,7 @@
               </div>
               <div class="flex items-center space-x-1">
                 <FileText class="w-3 h-3" />
-                <span>{(project.notes ?? []).length} notes</span>
+                <span>{project.note_count} note{project.note_count !== 1 ? 's' : ''}</span>
               </div>
             </div>
             <a
