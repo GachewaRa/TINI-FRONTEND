@@ -31,10 +31,7 @@
   let allAvailableTags: Tag[] = [];
   let allNotes: Note[] = [];
 
-  // Derived state for related notes
-  $: relatedNotes = allNotes.filter(note =>
-    note.projects?.some(p => p.id === project?.id)
-  );
+  $: relatedNotes = project?.notes || [];
 
   const statusOptions = [
     { value: 'ACTIVE', label: 'Active', description: 'Currently working on' },
@@ -51,12 +48,6 @@
   $: {
     allAvailableTags = $tags;
   }
-
-  allNotesStore.subscribe(value => {
-    allNotes = value;
-  });
-
-  
 
   // Update the onMount function to properly resolve tag IDs to tag objects
   onMount(async () => {
@@ -81,7 +72,7 @@
         } else {
             project = foundProject;
         }
-        console.log("FOUND PROJECT:", foundProject)
+        // console.log("FOUND PROJECT:", foundProject)
 
         // Initialize form fields
         title = project.title;
@@ -155,7 +146,7 @@
 
       // Update via API
       const updatedProject = await ProjectsAPI.updateProject(project.id, updateData);
-      console.log("UPDATED PROJECT OBJECT: ", updatedProject)
+      // console.log("UPDATED PROJECT OBJECT: ", updatedProject)
       // Update local project reference
       project = {
         ...updatedProject,
