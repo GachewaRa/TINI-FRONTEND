@@ -35,6 +35,13 @@
     await loadHighlights();
   }
   
+  // Function to strip HTML tags and get clean text
+  function stripHtml(html: string): string {
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    return tempDiv.textContent || tempDiv.innerText || '';
+  }
+  
   // Reactive filtering
   $: {
     filteredHighlights = $highlights.filter(highlight => {
@@ -111,61 +118,64 @@
       </button>
     </div>
   
-  <!-- Highlights List -->
+  <!-- Highlights Grid -->
   {:else}
-    <div class="space-y-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
       {#each filteredHighlights as highlight (highlight.id)}
-        <div class="card p-6 hover:shadow-xl transition-all duration-200 border-l-4 border-yellow-600">
+        <div class="card p-6 hover:shadow-xl transition-all duration-200 border-l-4 border-yellow-600 flex flex-col h-full">
           <!-- Header -->
           <div class="flex items-start justify-between mb-4">
-            <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-3 flex-1 min-w-0">
               <BookOpen class="w-6 h-6 text-yellow-600 flex-shrink-0" />
-              <div>
-                <h3 class="text-lg font-semibold text-yellow-600">{highlight.book_title}</h3>
+              <div class="min-w-0 flex-1">
+                <h3 class="text-lg font-semibold text-yellow-600 truncate">{highlight.book_title}</h3>
                 {#if highlight.author}
-                  <p class="text-sm text-gray-400 flex items-center space-x-1">
-                    <span>by {highlight.author}</span>
+                  <p class="text-sm text-gray-400 truncate">
+                    by {highlight.author}
                   </p>
                 {/if}
               </div>
             </div>
             
-            <div class="flex items-center space-x-4">
-              <div class="text-right">
-                <p class="text-xs text-gray-500 flex items-center space-x-1">
-                  <Calendar class="w-3 h-3" />
-                  <span>{highlight.created_at.toLocaleDateString()}</span>
-                </p>
-                <p class="text-xs text-gray-500 mt-1">
-                  {highlight.notes_from_highlight?.length || 0} notes created
-                </p>
-              </div>
-              <a 
-                href="/highlights/{highlight.id}"
-                class="text-sm text-yellow-600 hover:text-yellow-500 transition-colors font-medium"
-              >
-                Open →
-              </a>
-            </div>
+            <a 
+              href="/highlights/{highlight.id}"
+              class="text-sm text-yellow-600 hover:text-yellow-500 transition-colors font-medium flex-shrink-0 ml-2"
+            >
+              Open →
+            </a>
           </div>
           
           <!-- Content Preview -->
-          <div class="text-gray-300 leading-relaxed">
-            <p class="line-clamp-4">
-              {highlight.content.substring(0, 400)}
-              {#if highlight.content.length > 400}...{/if}
+          <div class="text-gray-300 leading-relaxed flex-1 mb-4">
+          {#each [highlight] as _}
+            {@const cleanContent = stripHtml(_.content)}
+            <p class="line-clamp-6">
+              {cleanContent.substring(0, 300)}
             </p>
-          </div>
+          {/each}
+        </div>
           
           <!-- Footer -->
-          <div class="flex items-center justify-between mt-4 pt-4 border-t border-gray-700">
-            <div class="text-xs text-gray-500">
-              {Math.ceil(highlight.content.length / 5)} words
+          <div class="space-y-3 mt-auto">
+            <!-- Metadata -->
+            <div class="flex items-center justify-between text-xs text-gray-500">
+              <div class="flex items-center space-x-1">
+                <Calendar class="w-3 h-3" />
+                <span>{highlight.created_at.toLocaleDateString()}</span>
+              </div>
+              <div>
+                {Math.ceil(stripHtml(highlight.content).length / 5)} words
+              </div>
             </div>
-            <div class="flex items-center space-x-2">
+            
+            <!-- Actions -->
+            <div class="flex items-center justify-between pt-3 border-t border-gray-700">
+              <div class="text-xs text-gray-500">
+                {highlight.notes_from_highlight?.length || 0} notes created
+              </div>
               <button 
                 class="text-xs text-gray-400 hover:text-yellow-600 transition-colors"
-                on:click={() => navigator.clipboard.writeText(highlight.content)}
+                on:click={() => navigator.clipboard.writeText(stripHtml(highlight.content))}
               >
                 Copy Content
               </button>
@@ -175,7 +185,7 @@
       {/each}
       
       {#if filteredHighlights.length === 0}
-        <div class="text-center py-12">
+        <div class="col-span-full text-center py-12">
           <BookOpen class="w-16 h-16 text-gray-600 mx-auto mb-4" />
           <h3 class="text-lg font-medium text-gray-400 mb-2">No highlights found</h3>
           <p class="text-gray-500 mb-6">
