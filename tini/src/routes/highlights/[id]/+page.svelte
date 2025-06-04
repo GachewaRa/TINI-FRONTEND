@@ -14,6 +14,7 @@
   let selectedText = '';
   let highlightContentElement: HTMLElement;
   let selectionTimeout: number;
+  let processedContent = '';
   
   // Get highlight ID from URL
   $: highlightId = $page.params.id;
@@ -23,6 +24,50 @@
 
   // Find notes created from this highlight
   $: relatedNotes = highlight?.notes_from_highlight || [];
+  
+  // Process content to mark text that has been made into notes
+  $: if (highlight && relatedNotes.length > 0) {
+    processedContent = markNotedText(highlight.content, relatedNotes);
+  } else if (highlight) {
+    processedContent = highlight.content;
+  }
+  
+  function markNotedText(content: string, notes: Note[]): string {
+    if (!notes || notes.length === 0) return content;
+    
+    // Strip HTML to get plain text for matching
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = content;
+    const plainText = tempDiv.textContent || tempDiv.innerText || '';
+    
+    let markedContent = content;
+    
+    // Sort notes by content length (longest first) to handle overlapping matches better
+    const sortedNotes = [...notes].sort((a, b) => b.content.length - a.content.length);
+    
+    sortedNotes.forEach(note => {
+      if (!note.content || note.content.trim().length === 0) return;
+      
+      const noteText = note.content.trim();
+      
+      // Create a regex to find the text (case insensitive, allowing for some HTML)
+      // This is a simple approach - you might want to make it more sophisticated
+      const escapedText = noteText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`(${escapedText})`, 'gi');
+      
+      // Check if this text exists in the plain text version
+      if (plainText.toLowerCase().includes(noteText.toLowerCase())) {
+        // Mark the text with a subtle indicator
+        markedContent = markedContent.replace(regex, (match) => {
+          // Check if this text is already marked to avoid double-marking
+          if (match.includes('📝')) return match;
+          return `<span class="noted-text" title="This text has been made into a note">📝 ${match} 📝</span>`;
+        });
+      }
+    });
+    
+    return markedContent;
+  }
   
   onMount(() => {
     document.addEventListener('selectionchange', handleSelectionChangeDebounced);
@@ -90,7 +135,8 @@
       }
       
       if (isWithinContent && newSelectedText !== selectedText) {
-        selectedText = newSelectedText;
+        // Clean the selected text of note markers for a cleaner note creation
+        selectedText = newSelectedText.replace(/📝\s*/g, '').trim();
         console.log('Text selected within content:', selectedText);
         console.log('Selected text length:', selectedText.length);
       } else if (!isWithinContent && selectedText) {
@@ -101,10 +147,6 @@
   }
   
   function handleCreateNote() {
-    // console.log('Create note button clicked');
-    // console.log('Selected text:', selectedText);
-    // console.log('Highlight:', highlight);
-    
     if (selectedText && highlight) {
       console.log('Opening create note modal');
       showCreateNoteModal = true;
@@ -129,7 +171,6 @@
   }
   
   function handleModalClose() {
-    console.log('Modal close event received');
     closeModal();
   }
   
@@ -186,10 +227,29 @@
   <title>{highlight ? `${highlight.book_title} - Highlights` : 'Highlight'} - PKMS</title>
 </svelte:head>
 
+<style>
+  .noted-text {
+    background: linear-gradient(120deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1));
+    border-radius: 4px;
+    padding: 1px 2px;
+    font-weight: 500;
+    color: #93c5fd;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    cursor: help;
+    transition: all 0.2s ease;
+  }
+  
+  .noted-text:hover {
+    background: linear-gradient(120deg, rgba(59, 130, 246, 0.2), rgba(147, 51, 234, 0.2));
+    border-color: rgba(59, 130, 246, 0.4);
+    transform: scale(1.02);
+  }
+</style>
+
 {#if highlight}
-  <div class="flex h-full flex-col">
+  <div class="flex h-screen flex-col">
     <!-- Fixed Header -->
-    <div class="sticky top-0 z-10 bg-gray-900 border-b border-gray-700 px-6 py-4">
+    <div class="sticky top-0 z-10 bg-gray-900 border-b border-gray-700 px-6 py-4 flex-shrink-0">
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-4">
           <button
@@ -231,62 +291,69 @@
       </div>
     </div>
 
-    <!-- Scrollable Content -->
-    <div class="flex flex-1 overflow-hidden">
-      <!-- Main Content -->
-      <div class="flex-1 px-6 py-6 overflow-y-auto">
-        <div class="space-y-6">
-          <!-- Selection Instructions -->
-          <div class="bg-yellow-600/10 border border-yellow-600/20 rounded-lg p-4">
-            <div class="flex items-start space-x-3">
-              <FileText class="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <h3 class="text-sm font-medium text-yellow-600 mb-1">Create Notes from Text</h3>
-                <p class="text-sm text-gray-300">
-                  Select any portion of the text below and click "Create Note" to turn it into a note with tags and comments.
-                </p>
+    <!-- Content Area with Independent Scrolling -->
+    <div class="flex flex-1 min-h-0">
+      <!-- Main Content - Independent Scrolling -->
+      <div class="flex-1 overflow-y-auto">
+        <div class="px-6 py-6">
+          <div class="space-y-6">
+            <!-- Selection Instructions -->
+            <div class="bg-yellow-600/10 border border-yellow-600/20 rounded-lg p-4">
+              <div class="flex items-start space-x-3">
+                <FileText class="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 class="text-sm font-medium text-yellow-600 mb-1">Create Notes from Text</h3>
+                  <p class="text-sm text-gray-300">
+                    Select any portion of the text below and click "Create Note" to turn it into a note with tags and comments.
+                    Text marked with 📝 has already been made into notes.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-          
-          <!-- Highlight Content -->
-          <div class="card p-6">
-            <div 
-              bind:this={highlightContentElement}
-              class="prose prose-invert max-w-none text-gray-300 leading-relaxed"
-              style="user-select: text; -webkit-user-select: text; -moz-user-select: text; -ms-user-select: text;"
-            >
-              {@html highlight.content}
-            </div>
-          </div>
-          
-          <!-- Metadata -->
-          <div class="card p-4">
-            <div class="flex items-center justify-between text-sm text-gray-400">
-              <div class="flex items-center space-x-4">
-                <span>Added: {highlight.created_at.toLocaleDateString()}</span>
-                <span>•</span>
-                <span>Words: {Math.ceil(highlight.content.replace(/<[^>]*>/g, '').length / 5)}</span>
+            
+            <!-- Highlight Content -->
+            <div class="card p-6">
+              <div 
+                bind:this={highlightContentElement}
+                class="prose prose-invert max-w-none text-gray-300 leading-relaxed"
+                style="user-select: text; -webkit-user-select: text; -moz-user-select: text; -ms-user-select: text;"
+              >
+                {@html processedContent}
               </div>
-              <div>
-                <span>{relatedNotes.length} notes created</span>
+            </div>
+            
+            <!-- Metadata -->
+            <div class="card p-4">
+              <div class="flex items-center justify-between text-sm text-gray-400">
+                <div class="flex items-center space-x-4">
+                  <span>Added: {highlight.created_at.toLocaleDateString()}</span>
+                  <span>•</span>
+                  <span>Words: {Math.ceil(highlight.content.replace(/<[^>]*>/g, '').length / 5)}</span>
+                </div>
+                <div>
+                  <span>{relatedNotes.length} notes created</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
       
-      <!-- Right Sidebar - Related Notes -->
-      <div class="w-80 border-l border-gray-700 pl-6 py-6 overflow-y-auto">
-        <div class="sticky top-0 space-y-4">
+      <!-- Right Sidebar - Independent Scrolling -->
+      <div class="w-80 border-l border-gray-700 flex flex-col">
+        <!-- Sidebar Header - Fixed -->
+        <div class="px-6 py-6 border-b border-gray-700 flex-shrink-0">
           <div class="flex items-center justify-between">
             <h2 class="text-lg font-semibold text-gray-200">Related Notes</h2>
             <span class="text-sm text-gray-400 bg-gray-800 px-2 py-1 rounded">
               {relatedNotes.length}
             </span>
           </div>
-          
-          <div class="space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto">
+        </div>
+        
+        <!-- Sidebar Content - Scrollable -->
+        <div class="flex-1 overflow-y-auto px-6 py-4">
+          <div class="space-y-3">
             {#each relatedNotes as note (note.id)}
               <div class="transform scale-90 origin-top-left">
                 <NoteCard {note} compact={true} />
