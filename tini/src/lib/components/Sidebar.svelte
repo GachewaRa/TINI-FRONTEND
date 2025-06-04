@@ -2,7 +2,8 @@
 <script lang="ts">
   import { 
     Home, 
-    FileText, 
+    FileText,
+    FileStack,
     Tag, 
     Highlighter, 
     FolderOpen, 
@@ -17,6 +18,12 @@
       name: 'Dashboard', 
       route: '/', 
       icon: Home,
+      active: true 
+    },
+    { 
+      name: 'Documents', 
+      route: '/documents', 
+      icon: FileStack,
       active: true 
     },
     { 
@@ -47,7 +54,7 @@
       name: 'Matters', 
       route: '/matters', 
       icon: MessageSquare,
-      active: false 
+      active: true 
     },
     { 
       name: 'Threads', 
