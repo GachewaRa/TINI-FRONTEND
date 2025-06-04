@@ -15,8 +15,6 @@
   let isLoading = true;
   let isDeleting = false;
   let error = '';
-  let showComments = false;
-
   let showAddToProject = false;
   let selectedProjectId = '';
   let isAddingToProject = false;
@@ -128,19 +126,11 @@
         </div>
       </div>
       
-      <!-- Update your existing button group div -->
-      <div class="flex items-center space-x-3 relative"> <!-- Added relative for dropdown positioning -->
-        <button
-          on:click={() => showComments = !showComments}
-          class="btn-secondary flex items-center space-x-2"
-        >
-          <MessageCircle class="w-4 h-4" />
-          <span>Comments ({note.comments?.length || 0})</span>
-        </button>
-        
+      <!-- Simplified button group -->
+      <div class="flex items-center space-x-3">
         <button
           on:click={() => showAddToProject = !showAddToProject}
-          class="btn-primary flex items-center space-x-2"
+          class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center space-x-2"
         >
           <FolderOpen class="w-4 h-4" />
           <span>Add to Project</span>
@@ -148,7 +138,7 @@
         
         <button
           on:click={editNote}
-          class="btn-primary flex items-center space-x-2"
+          class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center space-x-2"
         >
           <Edit class="w-4 h-4" />
           <span>Edit</span>
@@ -164,7 +154,6 @@
           <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
         </button>
       </div>
-        
     </div>
     
    <!-- Tags -->
@@ -239,33 +228,77 @@
       </div>
     </div>
     
-    <!-- Comments Section -->
-    {#if showComments}
+    <!-- Add to Project Section -->
+    {#if showAddToProject}
       <div class="card p-6 space-y-4">
-        <h3 class="text-xl font-semibold text-gray-200">Comments</h3>
+        <h3 class="text-xl font-semibold text-gray-200">Add to Project</h3>
         
-        {#if note.comments && note.comments.length > 0}
-          <div class="space-y-3">
-            {#each note.comments as comment}
-              <div class="bg-gray-700 p-4 rounded-lg">
-                <p class="text-gray-300">{comment.content}</p>
-                <div class="text-xs text-gray-500 mt-2">
-                  {new Date(comment.created_at).toLocaleString()}
-                </div>
-              </div>
-            {/each}
+        {#if $projectsStore.isLoading}
+          <div class="text-center py-4">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+            <p class="text-gray-400 mt-2">Loading projects...</p>
           </div>
         {:else}
-          <p class="text-gray-400">No comments yet.</p>
+          <div class="space-y-4">
+            <select
+              bind:value={selectedProjectId}
+              class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 outline-none"
+            >
+              <option value="">Select a project to add this note to</option>
+              {#each $projectsStore.projects.filter(p => p.status === 'ACTIVE') as project}
+                <option value={project.id}>{project.title}</option>
+              {/each}
+            </select>
+            
+            {#if addToProjectError}
+              <p class="text-red-400 text-sm">{addToProjectError}</p>
+            {/if}
+            
+            <div class="flex justify-end space-x-3">
+              <button
+                on:click={() => showAddToProject = false}
+                class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                on:click={addToProject}
+                disabled={!selectedProjectId || isAddingToProject}
+                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isAddingToProject ? 'Adding...' : 'Add to Project'}
+              </button>
+            </div>
+          </div>
         {/if}
-        
-        <div class="border-t border-gray-700 pt-4">
-          <p class="text-sm text-gray-400 mb-2">
-            To add comments, use the <button on:click={editNote} class="text-yellow-400 hover:text-yellow-300 underline">Edit</button> page.
-          </p>
-        </div>
       </div>
     {/if}
+    
+    <!-- Comments Section (Always Visible) -->
+    <div class="card p-6 space-y-4">
+      <h3 class="text-xl font-semibold text-gray-200">Comments</h3>
+      
+      {#if note.comments && note.comments.length > 0}
+        <div class="space-y-3">
+          {#each note.comments as comment}
+            <div class="bg-gray-700 p-4 rounded-lg">
+              <p class="text-gray-300">{comment.content}</p>
+              <div class="text-xs text-gray-500 mt-2">
+                {new Date(comment.created_at).toLocaleString()}
+              </div>
+            </div>
+          {/each}
+        </div>
+      {:else}
+        <p class="text-gray-400">No comments yet.</p>
+      {/if}
+      
+      <div class="border-t border-gray-700 pt-4">
+        <p class="text-sm text-gray-400 mb-2">
+          To add comments, use the <button on:click={editNote} class="text-yellow-400 hover:text-yellow-300 underline">Edit</button> page.
+        </p>
+      </div>
+    </div>
   </div>
 {:else}
   <div class="text-center py-12">
@@ -273,51 +306,5 @@
     <button on:click={goBack} class="btn-primary mt-4">
       Go Back to Notes
     </button>
-  </div>
-{/if}
-
-<!-- Add this modal/dropdown somewhere appropriate in your template -->
-{#if showAddToProject}
-  <div class="absolute right-0 mt-2 w-64 bg-gray-800 rounded-lg shadow-lg z-10 border border-gray-700">
-    <div class="p-4">
-      <h3 class="font-medium text-gray-200 mb-2">Add to Project</h3>
-      
-      {#if $projectsStore.isLoading}
-        <div class="text-center py-2">
-          <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-yellow-600 mx-auto"></div>
-        </div>
-      {:else}
-        <select
-          bind:value={selectedProjectId}
-          class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-200 mb-3"
-        >
-          <option value="">Select a project</option>
-          {#each $projectsStore.projects.filter(p => p.status === 'ACTIVE') as project}
-            <option value={project.id}>{project.title}</option>
-          {/each}
-        </select>
-        
-        {#if addToProjectError}
-          <p class="text-red-400 text-sm mb-2">{addToProjectError}</p>
-        {/if}
-        
-        <div class="flex justify-end space-x-2">
-          <button
-            on:click={() => showAddToProject = false}
-            class="btn-secondary text-sm px-3 py-1"
-          >
-            Cancel
-          </button>
-          <button
-            on:click={addToProject}
-            disabled={!selectedProjectId || isAddingToProject}
-            class="btn-primary text-sm px-3 py-1"
-            class:opacity-50={!selectedProjectId || isAddingToProject}
-          >
-            {isAddingToProject ? 'Adding...' : 'Add'}
-          </button>
-        </div>
-      {/if}
-    </div>
   </div>
 {/if}
