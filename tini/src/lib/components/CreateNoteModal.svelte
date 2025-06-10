@@ -5,6 +5,7 @@
   import type { Note, Tag, NoteCreate } from '$lib/types';
   import { NotesAPI } from '$lib/api/notes';
   import { tags, tagsStore } from '$lib/stores/tags';
+  import { projectsStore } from '$lib/stores/projects';
   
   export let selectedText: string = '';
   export let source: string = '';
@@ -13,6 +14,7 @@
   let title = '';
   let selectedTags: Tag[] = [];
   let allAvailableTags: Tag[] = [];
+  let selectedProjectId = '';
   let isLoading = false;
   let modalElement: HTMLElement;
   let titleInput: HTMLInputElement;
@@ -22,12 +24,13 @@
     close: void;
   }>();
   
-  // Load tags when component mounts
+  // Load tags and projects when component mounts
   onMount(async () => {
     try {
       await tagsStore.load();
+      await projectsStore.load();
     } catch (err) {
-      console.error('Failed to load tags:', err);
+      console.error('Failed to load tags/projects:', err);
     }
     
     // Focus the title input
@@ -49,6 +52,7 @@
   function closeModal() {
     title = '';
     selectedTags = [];
+    selectedProjectId = '';
     dispatch('close');
   }
   
@@ -67,7 +71,8 @@
         content: selectedText,
         source: source,
         highlights_id: highlightId,
-        tags: selectedTags.map(tag => tag.name.toString()) // Convert tags to IDs
+        tags: selectedTags.map(tag => tag.name.toString()),
+        project_id: selectedProjectId || undefined // Only include if a project is selected
       };
 
       console.log("NOTE DATA TO BACKEND: ", noteData)
@@ -77,6 +82,7 @@
       // Reset form
       title = '';
       selectedTags = [];
+      selectedProjectId = '';
       
       dispatch('noteCreated', createdNote);
       closeModal();
@@ -137,7 +143,26 @@
       />
     </div>
     
-    <!-- Tags Section - Matches Project Creator -->
+    <!-- Project Selection -->
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-300 mb-2">Add to Project (Optional)</label>
+      {#if $projectsStore.isLoading}
+        <div class="text-sm text-gray-400">Loading projects...</div>
+      {:else}
+        <select
+          bind:value={selectedProjectId}
+          class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:ring-2 focus:ring-yellow-600"
+          disabled={isLoading}
+        >
+          <option value="">No project selected</option>
+          {#each $projectsStore.projects.filter(p => p.status === 'ACTIVE') as project}
+            <option value={project.id}>{project.title}</option>
+          {/each}
+        </select>
+      {/if}
+      </div>
+    
+    
     <div class="mb-6">
       <label class="block text-sm font-medium text-gray-300 mb-2">Tags</label>
       {#if allAvailableTags.length > 0}
