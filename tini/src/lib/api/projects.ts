@@ -78,10 +78,11 @@ export class ProjectsAPI {
 
   // Remove note from project
   static async removeNoteFromProject(projectId: string, noteId: string): Promise<ProjectResponse> {
+    // Append noteId directly to the URL path
     return withLoading(
       apiClient.delete<ProjectResponse>(
-        `${this.BASE_PATH}/${projectId}/notes`,
-        { note_id: noteId }
+        `${this.BASE_PATH}/${projectId}/notes/${noteId}` // <--- Changed HERE
+        // No request body needed anymore
       )
     );
   }

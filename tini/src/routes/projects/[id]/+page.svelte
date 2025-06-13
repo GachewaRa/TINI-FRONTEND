@@ -179,8 +179,15 @@
     noteActionsLoading = new Set([...noteActionsLoading, noteId]);
     
     try {
-      await ProjectsAPI.hideNoteInProject(project.id, noteId);
-      hiddenNoteIds = new Set([...hiddenNoteIds, noteId]);
+      const updatedProject = await ProjectsAPI.hideNoteInProject(project.id, noteId);
+      project = {
+        ...updatedProject,
+        created_at: new Date(updatedProject.created_at),
+        updated_at: new Date(updatedProject.updated_at),
+        tags: updatedProject.tags || [],
+        notes: updatedProject.notes || []
+      };
+      hiddenNoteIds = new Set(updatedProject.hidden_note_ids?.map(id => id.toString()) || []);
     } catch (error) {
       console.error('Error hiding note:', error);
       errors.submit = error instanceof Error ? error.message : 'Failed to hide note';
@@ -195,8 +202,15 @@
     noteActionsLoading = new Set([...noteActionsLoading, noteId]);
     
     try {
-      await ProjectsAPI.unhideNoteInProject(project.id, noteId);
-      hiddenNoteIds = new Set([...hiddenNoteIds].filter(id => id !== noteId));
+      const updatedProject = await ProjectsAPI.unhideNoteInProject(project.id, noteId);
+      project = {
+        ...updatedProject,
+        created_at: new Date(updatedProject.created_at),
+        updated_at: new Date(updatedProject.updated_at),
+        tags: updatedProject.tags || [],
+        notes: updatedProject.notes || []
+      };
+      hiddenNoteIds = new Set(updatedProject.hidden_note_ids?.map(id => id.toString()) || []);
     } catch (error) {
       console.error('Error unhiding note:', error);
       errors.submit = error instanceof Error ? error.message : 'Failed to unhide note';
@@ -215,7 +229,6 @@
     noteActionsLoading = new Set([...noteActionsLoading, noteId]);
     
     try {
-      
       const updatedProject = await ProjectsAPI.removeNoteFromProject(project.id, noteId);
       project = {
         ...updatedProject,
