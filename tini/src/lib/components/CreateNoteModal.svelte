@@ -104,8 +104,8 @@
 </script>
 
 <!-- Modal Backdrop -->
-<div 
-  class="fixed inset-0 bg-black bg-opacity-20 backdrop-blur-sm flex items-center justify-center z-50"
+<div
+  class="fixed inset-0 bg-opacity-5 backdrop-blur-sm flex items-center justify-center z-50"
   on:click|self={closeModal}
   bind:this={modalElement}
 >
