@@ -14,7 +14,7 @@
   let title = '';
   let selectedTags: Tag[] = [];
   let allAvailableTags: Tag[] = [];
-  let selectedProjectId = '';
+  let selectedProjectIds: string[] = [];
   let isLoading = false;
   let modalElement: HTMLElement;
   let titleInput: HTMLInputElement;
@@ -49,10 +49,18 @@
     allAvailableTags = $tags;
   }
   
+  function toggleProject(projectId: string) {
+    if (selectedProjectIds.includes(projectId)) {
+      selectedProjectIds = selectedProjectIds.filter(id => id !== projectId);
+    } else {
+      selectedProjectIds = [...selectedProjectIds, projectId];
+    }
+  }
+  
   function closeModal() {
     title = '';
     selectedTags = [];
-    selectedProjectId = '';
+    selectedProjectIds = [];
     dispatch('close');
   }
   
@@ -72,7 +80,7 @@
         source: source,
         highlights_id: highlightId,
         tags: selectedTags.map(tag => tag.name.toString()),
-        project_id: selectedProjectId || undefined // Only include if a project is selected
+        project_ids: selectedProjectIds.length > 0 ? selectedProjectIds : undefined
       };
 
       console.log("NOTE DATA TO BACKEND: ", noteData)
@@ -82,7 +90,7 @@
       // Reset form
       title = '';
       selectedTags = [];
-      selectedProjectId = '';
+      selectedProjectIds = [];
       
       dispatch('noteCreated', createdNote);
       closeModal();
@@ -97,86 +105,98 @@
 
 <!-- Modal Backdrop -->
 <div 
-  class="fixed inset-0 bg-black bg-opacity-20 flex items-center justify-center z-50"
+  class="fixed inset-0 bg-black bg-opacity-20 backdrop-blur-sm flex items-center justify-center z-50"
   on:click|self={closeModal}
   bind:this={modalElement}
 >
-  <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+  <div class="bg-gray-800 rounded-lg w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center justify-between p-6 border-b border-gray-700">
       <h3 class="text-lg font-semibold text-gray-200">Create Note from Selection</h3>
       <button on:click={closeModal} class="text-gray-400 hover:text-white">
         <X class="w-5 h-5" />
       </button>
     </div>
     
-    <!-- Source Information -->
-    {#if source}
-      <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-300 mb-2">Source</label>
-        <div class="bg-gray-700 p-3 rounded text-sm text-gray-300">
-          {source}
+    <!-- Scrollable Content -->
+    <div class="flex-1 overflow-y-auto p-6 space-y-4">
+      <!-- Source Information -->
+      {#if source}
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">Source</label>
+          <div class="bg-gray-700 p-3 rounded text-sm text-gray-300">
+            {source}
+          </div>
+        </div>
+      {/if}
+      
+      <!-- Selected Text Preview -->
+      <div>
+        <label class="block text-sm font-medium text-gray-300 mb-2">Selected Text</label>
+        <div class="bg-gray-700 p-3 rounded text-sm text-gray-300 max-h-24 overflow-y-auto">
+          {selectedText}
         </div>
       </div>
-    {/if}
-    
-    <!-- Selected Text Preview -->
-    <div class="mb-4">
-      <label class="block text-sm font-medium text-gray-300 mb-2">Selected Text</label>
-      <div class="bg-gray-700 p-3 rounded text-sm text-gray-300 max-h-24 overflow-y-auto">
-        {selectedText}
-      </div>
-    </div>
-    
-    <!-- Title Input -->
-    <div class="mb-4">
-      <label class="block text-sm font-medium text-gray-300 mb-2">
-        Note Title <span class="text-red-400">*</span>
-      </label>
-      <input
-        bind:this={titleInput}
-        bind:value={title}
-        placeholder="Enter note title..."
-        class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:ring-2 focus:ring-yellow-600"
-        on:keydown={(e) => e.key === 'Enter' && createNote()}
-        disabled={isLoading}
-      />
-    </div>
-    
-    <!-- Project Selection -->
-    <div class="mb-4">
-      <label class="block text-sm font-medium text-gray-300 mb-2">Add to Project (Optional)</label>
-      {#if $projectsStore.isLoading}
-        <div class="text-sm text-gray-400">Loading projects...</div>
-      {:else}
-        <select
-          bind:value={selectedProjectId}
+      
+      <!-- Title Input -->
+      <div>
+        <label class="block text-sm font-medium text-gray-300 mb-2">
+          Note Title <span class="text-red-400">*</span>
+        </label>
+        <input
+          bind:this={titleInput}
+          bind:value={title}
+          placeholder="Enter note title..."
           class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:ring-2 focus:ring-yellow-600"
+          on:keydown={(e) => e.key === 'Enter' && createNote()}
           disabled={isLoading}
-        >
-          <option value="">No project selected</option>
-          {#each $projectsStore.projects.filter(p => p.status === 'ACTIVE') as project}
-            <option value={project.id}>{project.title}</option>
-          {/each}
-        </select>
-      {/if}
-      </div>
-    
-    
-    <div class="mb-6">
-      <label class="block text-sm font-medium text-gray-300 mb-2">Tags</label>
-      {#if allAvailableTags.length > 0}
-        <TagSelector 
-          bind:selectedTags={selectedTags} 
-          availableTags={allAvailableTags} 
         />
-      {:else}
-        <div class="text-sm text-gray-400">Loading tags...</div>
-      {/if}
+      </div>
+      
+      <!-- Project Selection -->
+      <div>
+        <label class="block text-sm font-medium text-gray-300 mb-2">
+          Add to Projects (Optional)
+          {#if selectedProjectIds.length > 0}
+            <span class="text-yellow-400 text-xs ml-1">({selectedProjectIds.length} selected)</span>
+          {/if}
+        </label>
+        {#if $projectsStore.isLoading}
+          <div class="text-sm text-gray-400">Loading projects...</div>
+        {:else}
+          <div class="bg-gray-700 border border-gray-600 rounded max-h-32 overflow-y-auto">
+            {#each $projectsStore.projects.filter(p => p.status === 'ACTIVE') as project}
+              <label class="flex items-center p-3 hover:bg-gray-600 cursor-pointer border-b border-gray-600 last:border-b-0">
+                <input
+                  type="checkbox"
+                  checked={selectedProjectIds.includes(project.id)}
+                  on:change={() => toggleProject(project.id)}
+                  class="mr-3 text-yellow-600 focus:ring-yellow-600 focus:ring-2"
+                  disabled={isLoading}
+                />
+                <span class="text-gray-200 text-sm">{project.title}</span>
+              </label>
+            {/each}
+          </div>
+        {/if}
+      </div>
+      
+      <!-- Tags Section -->
+      <div>
+        <label class="block text-sm font-medium text-gray-300 mb-2">Tags</label>
+        {#if allAvailableTags.length > 0}
+          <TagSelector 
+            bind:selectedTags={selectedTags} 
+            availableTags={allAvailableTags} 
+          />
+        {:else}
+          <div class="text-sm text-gray-400">Loading tags...</div>
+        {/if}
+      </div>
     </div>
     
-    <!-- Actions -->
-    <div class="flex justify-end space-x-3">
+    <!-- Fixed Actions Footer -->
+    <div class="flex justify-end space-x-3 p-6 border-t border-gray-700 bg-gray-800">
       <button on:click={closeModal} class="px-4 py-2 text-gray-400 hover:text-white">
         Cancel
       </button>
