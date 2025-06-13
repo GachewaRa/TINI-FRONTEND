@@ -2,10 +2,10 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
-  import { Save, ArrowLeft, Folder, Tag as TagIcon, FileText, Settings, ChevronUp, ChevronDown } from 'lucide-svelte';
+  import { Save, ArrowLeft, Folder, Tag as TagIcon, FileText, Settings, ChevronUp, ChevronDown, Eye, EyeOff, X, Trash2 } from 'lucide-svelte';
   import TinyMCEEditor from '$lib/components/TinyMCEEditor.svelte';
   import TagSelector from '$lib/components/TagSelector.svelte';
-  import NoteCard from '$lib/components/NoteCard.svelte';
+  import ProjectNoteCard from '$lib/components/ProjectNoteCard.svelte';
   import { projectFolders } from '$lib/stores/projectFolders';
   import { tags } from '$lib/stores/tags';
   import { projects } from '$lib/stores/projects';
@@ -26,13 +26,20 @@
   let selectedTags: Tag[] = [];
   let isSubmitting = false;
   let errors: { [key: string]: string } = {};
-  let showMetadata = false; // Controls the collapsed metadata panel
+  let showMetadata = false;
 
   let allProjectFolders: ProjectFolder[] = [];
   let allAvailableTags: Tag[] = [];
   let allNotes: Note[] = [];
 
+  // Note management state
+  let hiddenNoteIds: Set<string> = new Set();
+  let showHiddenNotes = false;
+  let noteActionsLoading: Set<string> = new Set();
+
   $: relatedNotes = project?.notes || [];
+  $: visibleNotes = relatedNotes.filter(note => !hiddenNoteIds.has(note.id));
+  $: hiddenNotes = relatedNotes.filter(note => hiddenNoteIds.has(note.id));
 
   const statusOptions = [
     { value: 'ACTIVE', label: 'Active', description: 'Currently working on' },
@@ -40,12 +47,11 @@
     { value: 'ARCHIVED', label: 'Archived', description: 'No longer active' }
   ];
 
-  // Subscribe to stores - using consistent pattern
+  // Subscribe to stores
   projectFolders.subscribe(value => {
     allProjectFolders = value;
   });
 
-  // Fixed: Use the derived store consistently
   $: {
     allAvailableTags = $tags;
   }
@@ -53,14 +59,12 @@
   onMount(async () => {
     projectId = $page.params.id;
     try {
-        // Load all required data first
         await Promise.all([
             projectFoldersStore.load(),
             tagsStore.load(),
             projectsStore.load()
         ]);
 
-        // Find project in store
         const foundProject = $projects.find(p => p.id === projectId);
         if (!foundProject) {
             const apiProject = await ProjectsAPI.getProject(projectId);
@@ -79,10 +83,7 @@
         status = project.status;
         selectedFolder = allProjectFolders.find(f => f.id === project.folder_id) || null;
         
-        // Updated: Handle tag names instead of IDs
         if (project.tags && project.tags.length > 0) {
- 
-            // Resolve tag names to full tag objects
             selectedTags = project.tags
                 .map(tagName => {
                     const foundTag = $tags.find(tag => tag.name === tagName);
@@ -93,24 +94,19 @@
                         return null;
                     }
                 })
-                .filter(tag => tag !== null); // Remove any null entries
-            
-           
+                .filter(tag => tag !== null);
         } else {
             selectedTags = [];
         }
-        
-      } catch (error) {
-          console.error('Failed to load project:', error);
-          goto('/projects');
-      }
-  });
 
-  $: {
-      if (selectedTags.length > 0) {
-          
-      }
-  }
+        // Initialize hidden notes from backend
+        hiddenNoteIds = new Set(project.hidden_note_ids?.map(id => id.toString()) || []);
+        
+    } catch (error) {
+        console.error('Failed to load project:', error);
+        goto('/projects');
+    }
+  });
 
   function validateForm(): boolean {
     errors = {};
@@ -140,7 +136,6 @@
         tags: selectedTags.map(t => t.id.toString())
       };
 
-      // Update via API
       const updatedProject = await ProjectsAPI.updateProject(project.id, updateData);
 
       project = {
@@ -175,6 +170,67 @@
       errors.submit = error instanceof Error ? error.message : 'Failed to delete project';
     } finally {
       isSubmitting = false;
+    }
+  }
+
+  async function handleHideNote(noteId: string) {
+    if (!project) return;
+    
+    noteActionsLoading = new Set([...noteActionsLoading, noteId]);
+    
+    try {
+      await ProjectsAPI.hideNoteInProject(project.id, noteId);
+      hiddenNoteIds = new Set([...hiddenNoteIds, noteId]);
+    } catch (error) {
+      console.error('Error hiding note:', error);
+      errors.submit = error instanceof Error ? error.message : 'Failed to hide note';
+    } finally {
+      noteActionsLoading = new Set([...noteActionsLoading].filter(id => id !== noteId));
+    }
+  }
+
+  async function handleUnhideNote(noteId: string) {
+    if (!project) return;
+    
+    noteActionsLoading = new Set([...noteActionsLoading, noteId]);
+    
+    try {
+      await ProjectsAPI.unhideNoteInProject(project.id, noteId);
+      hiddenNoteIds = new Set([...hiddenNoteIds].filter(id => id !== noteId));
+    } catch (error) {
+      console.error('Error unhiding note:', error);
+      errors.submit = error instanceof Error ? error.message : 'Failed to unhide note';
+    } finally {
+      noteActionsLoading = new Set([...noteActionsLoading].filter(id => id !== noteId));
+    }
+  }
+
+  async function handleRemoveNote(noteId: string) {
+    if (!project) return;
+
+    if (!confirm('Are you sure you want to remove this note from the project?')) {
+      return;
+    }
+    
+    noteActionsLoading = new Set([...noteActionsLoading, noteId]);
+    
+    try {
+      
+      const updatedProject = await ProjectsAPI.removeNoteFromProject(project.id, noteId);
+      project = {
+        ...updatedProject,
+        created_at: new Date(updatedProject.created_at),
+        updated_at: new Date(updatedProject.updated_at),
+        tags: updatedProject.tags || [],
+        notes: updatedProject.notes || []
+      };
+      // Remove from hidden notes if it was hidden
+      hiddenNoteIds = new Set([...hiddenNoteIds].filter(id => id !== noteId));
+    } catch (error) {
+      console.error('Error removing note:', error);
+      errors.submit = error instanceof Error ? error.message : 'Failed to remove note from project';
+    } finally {
+      noteActionsLoading = new Set([...noteActionsLoading].filter(id => id !== noteId));
     }
   }
 
@@ -383,20 +439,66 @@
       <div class="flex-shrink-0 p-4 border-b border-gray-700">
         <div class="flex items-center justify-between">
           <h2 class="text-sm font-semibold text-gray-200">Related Notes</h2>
-          <span class="text-xs text-gray-400 bg-gray-800 px-2 py-1 rounded">
-            {relatedNotes.length}
-          </span>
+          <div class="flex items-center space-x-2">
+            <span class="text-xs text-gray-400 bg-gray-800 px-2 py-1 rounded">
+              {visibleNotes.length}/{relatedNotes.length}
+            </span>
+            {#if hiddenNotes.length > 0}
+              <button
+                type="button"
+                on:click={() => showHiddenNotes = !showHiddenNotes}
+                class="p-1 text-gray-400 hover:text-gray-200 transition-colors"
+                title={showHiddenNotes ? 'Hide hidden notes' : 'Show hidden notes'}
+              >
+                {#if showHiddenNotes}
+                  <EyeOff class="w-3 h-3" />
+                {:else}
+                  <Eye class="w-3 h-3" />
+                {/if}
+              </button>
+            {/if}
+          </div>
         </div>
       </div>
 
       <div class="flex-1 overflow-y-auto p-4">
         <div class="space-y-3">
-          {#if project} 
-            {#each relatedNotes as note (note.id)}
-              <div class="transform scale-90 origin-top-left">
-                <NoteCard {note} compact={true} />
+          {#if project}
+            <!-- Visible Notes -->
+            {#each visibleNotes as note (note.id)}
+              <ProjectNoteCard 
+                {note} 
+                compact={true}
+                isLoading={noteActionsLoading.has(note.id)}
+                on:hide={(e) => handleHideNote(e.detail.noteId)}
+                on:remove={(e) => handleRemoveNote(e.detail.noteId)}
+              />
+            {/each}
+
+            <!-- Hidden Notes Section -->
+            {#if showHiddenNotes && hiddenNotes.length > 0}
+              <div class="border-t border-gray-700 pt-3 mt-3">
+                <h3 class="text-xs font-medium text-gray-400 mb-2 flex items-center">
+                  <EyeOff class="w-3 h-3 mr-1" />
+                  Hidden Notes ({hiddenNotes.length})
+                </h3>
+                {#each hiddenNotes as note (note.id)}
+                  <div class="mb-3">
+                    <ProjectNoteCard 
+                      {note} 
+                      compact={true}
+                      isHidden={true}
+                      isLoading={noteActionsLoading.has(note.id)}
+                      on:unhide={(e) => handleUnhideNote(e.detail.noteId)}
+                      on:remove={(e) => handleRemoveNote(e.detail.noteId)}
+                    />
+                  </div>
+                {/each}
               </div>
-            {:else}
+            {/if}
+
+            <!-- Empty State -->
+            {#if relatedNotes.length === 0}
               <div class="text-center py-8">
                 <FileText class="w-8 h-8 text-gray-600 mx-auto mb-2" />
                 <p class="text-xs text-gray-400 mb-1">No notes yet</p>
@@ -404,7 +506,15 @@
                   Notes linked to this project will appear here.
                 </p>
               </div>
-            {/each}
+            {:else if visibleNotes.length === 0}
+              <div class="text-center py-8">
+                <EyeOff class="w-8 h-8 text-gray-600 mx-auto mb-2" />
+                <p class="text-xs text-gray-400 mb-1">All notes are hidden</p>
+                <p class="text-xs text-gray-500">
+                  Click the eye icon above to show hidden notes.
+                </p>
+              </div>
+            {/if}
           {:else}
             <div class="text-center py-8 text-gray-500">
               <p class="text-xs">Loading notes...</p>

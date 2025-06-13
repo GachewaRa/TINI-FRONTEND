@@ -115,7 +115,7 @@ class APIClient {
     });
   }
 
-  async delete<T>(endpoint: string): Promise<T> {
+  async delete<T>(endpoint: string, p0: { note_id: string; }): Promise<T> {
     return this.request<T>(endpoint, { method: 'DELETE' });
   }
 }

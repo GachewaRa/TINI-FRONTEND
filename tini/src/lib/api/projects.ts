@@ -74,4 +74,33 @@ export class ProjectsAPI {
       )
     );
   }
+
+
+  // Remove note from project
+  static async removeNoteFromProject(projectId: string, noteId: string): Promise<ProjectResponse> {
+    return withLoading(
+      apiClient.delete<ProjectResponse>(
+        `${this.BASE_PATH}/${projectId}/notes`,
+        { note_id: noteId }
+      )
+    );
+  }
+
+  // Hide note in project
+  static async hideNoteInProject(projectId: string, noteId: string): Promise<ProjectResponse> {
+    return withLoading(
+      apiClient.post<ProjectResponse>(
+        `${this.BASE_PATH}/${projectId}/notes/${noteId}/hide`
+      )
+    );
+  }
+
+  // Unhide note in project
+  static async unhideNoteInProject(projectId: string, noteId: string): Promise<ProjectResponse> {
+    return withLoading(
+      apiClient.delete<ProjectResponse>(
+        `${this.BASE_PATH}/${projectId}/notes/${noteId}/hide`
+      )
+    );
+  }
 }
