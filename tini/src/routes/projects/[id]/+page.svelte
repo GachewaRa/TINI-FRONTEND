@@ -17,14 +17,16 @@
   import type { Project, ProjectFolder, Tag, Note } from '$lib/types';
 
   let projectId: string;
-  let project: Project | null = null;
+
+  // Use the store directly as the source of truth
+  $: project = $projects.find(p => p.id === projectId) || null;
 
   let title = '';
   let content = '';
   let status = 'ACTIVE';
   let selectedFolder: ProjectFolder | null = null;
   let selectedTags: Tag[] = [];
-  let isSubmitting = false;
+  let isSubmitting = false;  
   let errors: { [key: string]: string } = {};
   let showMetadata = false;
 
@@ -32,14 +34,21 @@
   let allAvailableTags: Tag[] = [];
   let allNotes: Note[] = [];
 
-  // Note management state
-  let hiddenNoteIds: Set<string> = new Set();
+  // Note management state - derived from project
   let showHiddenNotes = false;
   let noteActionsLoading: Set<string> = new Set();
 
+  // Make these truly reactive based on the project from store
+  $: hiddenNoteIds = new Set(project?.hidden_note_ids?.map(id => id.toString()) || []);
   $: relatedNotes = project?.notes || [];
   $: visibleNotes = relatedNotes.filter(note => !hiddenNoteIds.has(note.id));
   $: hiddenNotes = relatedNotes.filter(note => hiddenNoteIds.has(note.id));
+
+  // Debug reactive statements
+  $: if (project) {
+    console.log('Project updated:', project.id, 'Hidden IDs:', project.hidden_note_ids);
+    console.log('Visible notes:', visibleNotes.length, 'Hidden notes:', hiddenNotes.length);
+  }
 
   const statusOptions = [
     { value: 'ACTIVE', label: 'Active', description: 'Currently working on' },
@@ -56,51 +65,59 @@
     allAvailableTags = $tags;
   }
 
+  // Watch for project changes and update form fields
+  $: if (project && projectId) {
+    updateFormFields();
+  }
+
+  function updateFormFields() {
+    if (!project) return;
+    
+    title = project.title;
+    content = project.content;
+    status = project.status;
+    selectedFolder = allProjectFolders.find(f => f.id === project.folder_id) || null;
+    
+    if (project.tags && project.tags.length > 0) {
+        selectedTags = project.tags
+            .map(tagName => {
+                const foundTag = $tags.find(tag => tag.name === tagName);
+                if (foundTag) {
+                    return foundTag;
+                } else {
+                    console.warn("⚠️ Edit Project - Tag not found for name:", tagName);
+                    return null;
+                }
+            })
+            .filter(tag => tag !== null);
+    } else {
+        selectedTags = [];
+    }
+  }
+
   onMount(async () => {
     projectId = $page.params.id;
+    
     try {
+        // Load all necessary data
         await Promise.all([
             projectFoldersStore.load(),
             tagsStore.load(),
             projectsStore.load()
         ]);
 
-        const foundProject = $projects.find(p => p.id === projectId);
-        if (!foundProject) {
-            const apiProject = await ProjectsAPI.getProject(projectId);
-            project = {
-                ...apiProject,
-                created_at: new Date(apiProject.created_at),
-                updated_at: new Date(apiProject.updated_at)
-            };
-        } else {
-            project = foundProject;
-        }
-
-        // Initialize form fields
-        title = project.title;
-        content = project.content;
-        status = project.status;
-        selectedFolder = allProjectFolders.find(f => f.id === project.folder_id) || null;
+        // Check if project exists in store
+        let foundProject = $projects.find(p => p.id === projectId);
         
-        if (project.tags && project.tags.length > 0) {
-            selectedTags = project.tags
-                .map(tagName => {
-                    const foundTag = $tags.find(tag => tag.name === tagName);
-                    if (foundTag) {
-                        return foundTag;
-                    } else {
-                        console.warn("⚠️ Edit Project - Tag not found for name:", tagName);
-                        return null;
-                    }
-                })
-                .filter(tag => tag !== null);
-        } else {
-            selectedTags = [];
+        if (!foundProject) {
+            // If not in store, fetch from API and add to store
+            console.log('Project not in store, fetching from API...');
+            const apiProject = await ProjectsAPI.getProject(projectId);
+            foundProject = projectsStore.updateProject(apiProject);
         }
 
-        // Initialize hidden notes from backend
-        hiddenNoteIds = new Set(project.hidden_note_ids?.map(id => id.toString()) || []);
+        // At this point, the reactive statements should handle the rest
+        console.log('Project loaded:', foundProject, 'Hidden note IDs:', foundProject.hidden_note_ids);
         
     } catch (error) {
         console.error('Failed to load project:', error);
@@ -137,14 +154,8 @@
       };
 
       const updatedProject = await ProjectsAPI.updateProject(project.id, updateData);
-
-      project = {
-        ...updatedProject,
-        created_at: new Date(updatedProject.created_at),
-        updated_at: new Date(updatedProject.updated_at),
-        tags: updatedProject.tags || [],
-        notes: updatedProject.notes || []
-      };
+      // Update the store with the new project data
+      projectsStore.updateProject(updatedProject);
 
     } catch (error) {
       console.error('Error updating project:', error);
@@ -180,14 +191,10 @@
     
     try {
       const updatedProject = await ProjectsAPI.hideNoteInProject(project.id, noteId);
-      project = {
-        ...updatedProject,
-        created_at: new Date(updatedProject.created_at),
-        updated_at: new Date(updatedProject.updated_at),
-        tags: updatedProject.tags || [],
-        notes: updatedProject.notes || []
-      };
-      hiddenNoteIds = new Set(updatedProject.hidden_note_ids?.map(id => id.toString()) || []);
+      // Update the store - this will trigger all reactive statements
+      // console.log("UPDATED PROJECT AFTER HIDING NOTE: ", updatedProject)
+      projectsStore.updateProject(updatedProject);
+      console.log('NOTES HIDDEN IN UPDATED PROJECT:', updatedProject.hidden_note_ids);
     } catch (error) {
       console.error('Error hiding note:', error);
       errors.submit = error instanceof Error ? error.message : 'Failed to hide note';
@@ -203,14 +210,9 @@
     
     try {
       const updatedProject = await ProjectsAPI.unhideNoteInProject(project.id, noteId);
-      project = {
-        ...updatedProject,
-        created_at: new Date(updatedProject.created_at),
-        updated_at: new Date(updatedProject.updated_at),
-        tags: updatedProject.tags || [],
-        notes: updatedProject.notes || []
-      };
-      hiddenNoteIds = new Set(updatedProject.hidden_note_ids?.map(id => id.toString()) || []);
+      // Update the store - this will trigger all reactive statements
+      projectsStore.updateProject(updatedProject);
+      console.log('NOTES UNHIDDEN:', updatedProject.hidden_note_ids);
     } catch (error) {
       console.error('Error unhiding note:', error);
       errors.submit = error instanceof Error ? error.message : 'Failed to unhide note';
@@ -230,15 +232,8 @@
     
     try {
       const updatedProject = await ProjectsAPI.removeNoteFromProject(project.id, noteId);
-      project = {
-        ...updatedProject,
-        created_at: new Date(updatedProject.created_at),
-        updated_at: new Date(updatedProject.updated_at),
-        tags: updatedProject.tags || [],
-        notes: updatedProject.notes || []
-      };
-      // Remove from hidden notes if it was hidden
-      hiddenNoteIds = new Set([...hiddenNoteIds].filter(id => id !== noteId));
+      // Update the store - this will trigger all reactive statements
+      projectsStore.updateProject(updatedProject);
     } catch (error) {
       console.error('Error removing note:', error);
       errors.submit = error instanceof Error ? error.message : 'Failed to remove note from project';

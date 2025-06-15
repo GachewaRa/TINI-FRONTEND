@@ -16,57 +16,59 @@
     AlertCircle,
     Highlighter, 
     BookOpen,
-
-    HighlighterIcon
-
+    ZoomIn,
+    ZoomOut,
+    RotateCw,
+    Download
   } from 'lucide-svelte';
   import { currentDocument, highlightMode } from '$lib/stores/document';
   import { fetchDocument } from '$lib/api/document';
   import { createDocumentHighlight } from '$lib/api/document';
-//   import { getTextSelection, clearSelection, highlightColor } from '$lib/utils/document';
   import type { Document, TextSelection } from '$lib/types/document';
-    import { clearSelection, getTextSelection } from '$lib/api/utils/document';
   
-  let document: Document | null = null;
+  let pdfDocument: Document | null = null;
   let isLoading = true;
   let error = '';
   let selectedText: TextSelection | null = null;
-  let showHighlightPanel = false;
+  let showHighlightPreview = false;
   let highlightNote = '';
   let highlightColorValue = '#ffff00';
   let isFavorite = false;
   let isCreatingHighlight = false;
+  let pdfDoc = null;
+  let currentPage = 1;
+  let totalPages = 0;
+  let scale = 1.2;
+  let isAddToHighlightsMode = false;
+  let selectedTextInfo = null;
+
+  let canvasElement;
   
   const documentId = $page.params.id;
   
   const highlightColors = [
     { name: 'Yellow', value: '#ffff00' },
-    { name: 'Green', value: '#00ff00' },
-    { name: 'Blue', value: '#00bfff' },
-    { name: 'Pink', value: '#ff69b4' },
-    { name: 'Orange', value: '#ffa500' },
-    { name: 'Purple', value: '#da70d6' }
+    { name: 'Green', value: '#90EE90' },
+    { name: 'Blue', value: '#87CEEB' },
+    { name: 'Pink', value: '#FFB6C1' },
+    { name: 'Orange', value: '#FFA500' },
+    { name: 'Purple', value: '#DDA0DD' }
   ];
   
-//   onMount(async () => {
-//     await loadDocument();
-//     setupTextSelection();
-//   });
-
   onMount(async () => {
     await loadDocument();
-    // Only call setupTextSelection if running in the browser
-    if (browser) {
-      setupTextSelection();
+    if (browser && pdfDocument?.file_type === 'pdf') {
+      await initializePdfViewer();
     }
   });
   
+
   async function loadDocument() {
     try {
       isLoading = true;
       error = '';
-      document = await fetchDocument(documentId);
-      currentDocument.set(document);
+      pdfDocument = await fetchDocument(documentId); // Use pdfDocument instead
+      currentDocument.set(pdfDocument);
     } catch (err) {
       console.error('Error loading document:', err);
       error = err instanceof Error ? err.message : 'Failed to load document';
@@ -75,71 +77,267 @@
     }
   }
   
-  function setupTextSelection() {
-    // This code will only be executed if 'browser' is true, i.e., in the client-side
-    // You also need to define handleTextSelection somewhere in your script
-    document.addEventListener('mouseup', handleTextSelection);
-    document.addEventListener('keyup', handleTextSelection);
+  async function initializePdfViewer() {
+    try {
+      // Ensure we have the DOM document object
+      const domDocument = document;
+      
+      // Load PDF.js if not already loaded
+      if (!window.pdfjsLib) {
+        await new Promise((resolve) => {
+          const script = domDocument.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+          script.onload = () => {
+            window.pdfjsLib = {
+              ...window.pdfjsLib,
+              GlobalWorkerOptions: {
+                workerSrc: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+              }
+            };
+            resolve();
+          };
+          domDocument.head.appendChild(script);
+        });
+      }
+      
+      await loadPdf();
+    } catch (err) {
+      console.error('Error initializing PDF viewer:', err);
+      error = 'Failed to initialize PDF viewer';
+    }
   }
   
-  function handleTextSelection() {
-    if (!$highlightMode) return;
+  async function loadPdf() {
+    try {
+      console.log('Loading PDF:', pdfDocument?.cloudinary_url); // Debug log
+      
+      if (!window.pdfjsLib || !pdfDocument?.cloudinary_url) {
+        throw new Error('PDF library not loaded or document URL missing');
+      }
+
+      const loadingTask = window.pdfjsLib.getDocument(pdfDocument.cloudinary_url);
+      pdfDoc = await loadingTask.promise;
+      
+      console.log('PDF loaded successfully, pages:', pdfDoc.numPages); // Debug log
+      
+      totalPages = pdfDoc.numPages;
+      
+      // Wait for canvas to be available
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      await renderPage(1);
+      setupTextSelectionListener();
+    } catch (err) {
+      console.error('Error loading PDF:', err);
+      error = 'Failed to load PDF document: ' + err.message;
+    }
+  }
+  
+  async function renderPage(pageNum) {
+    if (!pdfDoc || !canvasElement) return;
     
-    const selection = getTextSelection();
-    if (selection && selection.text.length > 0) {
-      selectedText = selection;
-      showHighlightPanel = true;
+    try {
+      const page = await pdfDoc.getPage(pageNum);
+      const viewport = page.getViewport({ scale });
+      
+      const context = canvasElement.getContext('2d');
+      
+      canvasElement.height = viewport.height;
+      canvasElement.width = viewport.width;
+      
+      const renderContext = {
+        canvasContext: context,
+        viewport: viewport
+      };
+      
+      await page.render(renderContext).promise;
+      await renderHighlights(page, viewport);
+      currentPage = pageNum;
+    } catch (err) {
+      console.error('Error rendering page:', err);
     }
   }
   
-  function toggleHighlightMode() {
-    highlightMode.update(mode => !mode);
-    if (!$highlightMode) {
-      clearSelection();
-      hideHighlightPanel();
+  async function renderHighlights(page, viewport) {
+    if (!pdfDocument?.document_highlights) return; // Changed from document
+    
+    const canvas = document.getElementById('pdf-canvas'); // This document is correct (DOM)
+    const context = canvas.getContext('2d');
+    
+    const textContent = await page.getTextContent();
+    
+    pdfDocument.document_highlights // Changed from document
+      .filter(highlight => highlight.page_number === currentPage)
+      .forEach(highlight => {
+        context.fillStyle = highlight.color + '40';
+        context.fillRect(
+          highlight.x_coordinate * scale,
+          highlight.y_coordinate * scale,
+          highlight.width * scale,
+          highlight.height * scale
+        );
+      });
+  }
+  
+  function setupTextSelectionListener() {
+    const canvas = document.getElementById('pdf-canvas');
+    let isSelecting = false;
+    let startX, startY, endX, endY;
+    
+    canvas.addEventListener('mousedown', (e) => {
+      if (!isAddToHighlightsMode) return;
+      isSelecting = true;
+      const rect = canvas.getBoundingClientRect();
+      startX = e.clientX - rect.left;
+      startY = e.clientY - rect.top;
+    });
+    
+    canvas.addEventListener('mousemove', (e) => {
+      if (!isSelecting || !isAddToHighlightsMode) return;
+      const rect = canvas.getBoundingClientRect();
+      endX = e.clientX - rect.left;
+      endY = e.clientY - rect.top;
+      // Draw selection rectangle
+      drawSelectionRectangle(startX, startY, endX, endY);
+    });
+    
+    canvas.addEventListener('mouseup', async (e) => {
+      if (!isSelecting || !isAddToHighlightsMode) return;
+      isSelecting = false;
+      
+      const rect = canvas.getBoundingClientRect();
+      endX = e.clientX - rect.left;
+      endY = e.clientY - rect.top;
+      
+      // Extract text from selection
+      await extractSelectedText(startX, startY, endX, endY);
+    });
+  }
+  
+  function drawSelectionRectangle(startX, startY, endX, endY) {
+    const canvas = document.getElementById('pdf-canvas');
+    const context = canvas.getContext('2d');
+    
+    // Redraw the page to clear previous selection
+    renderPage(currentPage);
+    
+    // Draw selection rectangle
+    context.strokeStyle = '#007ACC';
+    context.lineWidth = 2;
+    context.setLineDash([5, 5]);
+    context.strokeRect(
+      Math.min(startX, endX),
+      Math.min(startY, endY),
+      Math.abs(endX - startX),
+      Math.abs(endY - startY)
+    );
+  }
+  
+  async function extractSelectedText(startX, startY, endX, endY) {
+    if (!pdfDoc) return;
+    
+    try {
+      const page = await pdfDoc.getPage(currentPage);
+      const textContent = await page.getTextContent();
+      const viewport = page.getViewport({ scale });
+      
+      // Convert canvas coordinates to PDF coordinates
+      const pdfStartX = startX / scale;
+      const pdfStartY = (viewport.height - startY) / scale;
+      const pdfEndX = endX / scale;
+      const pdfEndY = (viewport.height - endY) / scale;
+      
+      // Extract text within the selection bounds
+      let selectedText = '';
+      const selectedItems = [];
+      
+      textContent.items.forEach(item => {
+        const transform = item.transform;
+        const x = transform[4];
+        const y = transform[5];
+        const width = item.width;
+        const height = item.height;
+        
+        // Check if text item intersects with selection
+        if (x >= Math.min(pdfStartX, pdfEndX) && 
+            x + width <= Math.max(pdfStartX, pdfEndX) &&
+            y >= Math.min(pdfStartY, pdfEndY) && 
+            y + height <= Math.max(pdfStartY, pdfEndY)) {
+          selectedText += item.str + ' ';
+          selectedItems.push(item);
+        }
+      });
+      
+      if (selectedText.trim()) {
+        selectedTextInfo = {
+          text: selectedText.trim(),
+          page: currentPage,
+          totalPages: totalPages,
+          boundingRect: {
+            x: Math.min(startX, endX),
+            y: Math.min(startY, endY),
+            width: Math.abs(endX - startX),
+            height: Math.abs(endY - startY)
+          },
+          pdfCoordinates: {
+            x: Math.min(pdfStartX, pdfEndX),
+            y: Math.min(pdfStartY, pdfEndY),
+            width: Math.abs(pdfEndX - pdfStartX),
+            height: Math.abs(pdfEndY - pdfStartY)
+          }
+        };
+        
+        showHighlightPreview = true;
+      }
+    } catch (err) {
+      console.error('Error extracting text:', err);
     }
   }
   
-  function hideHighlightPanel() {
-    showHighlightPanel = false;
-    selectedText = null;
+  function toggleAddToHighlightsMode() {
+    isAddToHighlightsMode = !isAddToHighlightsMode;
+    if (!isAddToHighlightsMode) {
+      hideHighlightPreview();
+      // Redraw page to clear any selection rectangles
+      if (pdfDoc) renderPage(currentPage);
+    }
+  }
+  
+  function hideHighlightPreview() {
+    showHighlightPreview = false;
+    selectedTextInfo = null;
     highlightNote = '';
     isFavorite = false;
-    clearSelection();
   }
   
   async function createHighlight() {
-    if (!selectedText || !document) return;
+    if (!selectedTextInfo || !pdfDocument) return;
     
     try {
       isCreatingHighlight = true;
       
       const highlightData = {
-        document_id: document.id,
-        selected_text: selectedText.text,
-        context_before: selectedText.contextBefore,
-        context_after: selectedText.contextAfter,
-        start_offset: selectedText.startOffset,
-        end_offset: selectedText.endOffset,
+        document_id: pdfDocument.id,
+        selected_text: selectedTextInfo.text,
+        page_number: selectedTextInfo.page,
         user_note: highlightNote.trim() || undefined,
         color: highlightColorValue,
-        is_favorite: isFavorite
+        is_favorite: isFavorite,
+        x_coordinate: selectedTextInfo.pdfCoordinates.x,
+        y_coordinate: selectedTextInfo.pdfCoordinates.y,
+        width: selectedTextInfo.pdfCoordinates.width,
+        height: selectedTextInfo.pdfCoordinates.height
       };
-      
-      // Add position data if available
-      if (selectedText.boundingRect) {
-        highlightData.x_coordinate = selectedText.boundingRect.x;
-        highlightData.y_coordinate = selectedText.boundingRect.y;
-        highlightData.width = selectedText.boundingRect.width;
-        highlightData.height = selectedText.boundingRect.height;
-      }
       
       await createDocumentHighlight(highlightData);
       
       // Reload document to get updated highlights
       await loadDocument();
       
-      hideHighlightPanel();
+      // Re-render current page with new highlight
+      if (pdfDoc) await renderPage(currentPage);
+      
+      hideHighlightPreview();
       
     } catch (err) {
       console.error('Error creating highlight:', err);
@@ -149,42 +347,94 @@
     }
   }
   
-  function renderDocumentViewer() {
-    if (!document) return;
-    
-    if (document.file_type === 'pdf') {
-      return `
-        <iframe 
-          src="${document.cloudinary_url}" 
-          width="100%" 
-          height="800px"
-          class="border border-gray-700 rounded-lg"
-          title="${document.title}"
-        ></iframe>
-      `;
-    } else if (document.file_type === 'epub') {
-      return `
-        <div class="bg-gray-800 border border-gray-700 rounded-lg p-8 text-center">
-          <BookOpen class="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 class="text-lg font-medium text-gray-200 mb-2">EPUB Viewer</h3>
-          <p class="text-gray-400 mb-4">
-            EPUB viewing is not yet fully implemented. You can download the file to read it in your preferred EPUB reader.
-          </p>
-          <a 
-            href="${document.cloudinary_url}" 
-            target="_blank"
-            class="btn-primary inline-flex items-center space-x-2"
-          >
-            <span>Download EPUB</span>
-          </a>
-        </div>
-      `;
+  function nextPage() {
+    if (currentPage < totalPages) {
+      renderPage(currentPage + 1);
     }
+  }
+  
+  function prevPage() {
+    if (currentPage > 1) {
+      renderPage(currentPage - 1);
+    }
+  }
+  
+  function zoomIn() {
+    scale = Math.min(scale * 1.2, 3);
+    renderPage(currentPage);
+  }
+  
+  function zoomOut() {
+    scale = Math.max(scale / 1.2, 0.5);
+    renderPage(currentPage);
+  }
+  
+  // function renderDocumentViewer() {
+  //   if (!pdfDocument) return;
+    // {#if pdfDocument}
+    //   {#if pdfDocument.file_type === 'pdf'}
+    //     <div class="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden">
+    //       <!-- PDF Controls -->
+    //       <div class="bg-gray-800 px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+    //         <div class="flex items-center space-x-4">
+    //           <div class="flex items-center space-x-2">
+    //             <button on:click={prevPage} class="p-2 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded">
+    //               ←
+    //             </button>
+    //             <span class="text-sm text-gray-300">
+    //               Page {currentPage} of {totalPages}
+    //             </span>
+    //             <button on:click={nextPage} class="p-2 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded">
+    //               →
+    //             </button>
+    //           </div>
+              
+    //           <div class="flex items-center space-x-2">
+    //             <button on:click={zoomOut} class="p-2 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded">
+    //               <ZoomOut class="w-4 h-4" />
+    //             </button>
+    //             <span class="text-sm text-gray-300">{Math.round(scale * 100)}%</span>
+    //             <button on:click={zoomIn} class="p-2 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded">
+    //               <ZoomIn class="w-4 h-4" />
+    //             </button>
+    //           </div>
+    //         </div>
+    //       </div>
+          
+          
+    //       <div class="p-4 bg-gray-900 overflow-auto max-h-[800px]">
+    //         <div class="flex justify-center">
+    //           <canvas id="pdf-canvas" bind:this={canvasElement} class="border border-gray-600 shadow-lg max-w-full"></canvas>
+    //         </div>
+    //       </div>
+    //     </div>
+    //   {:else if pdfDocument.file_type === 'epub'}
+    //     <div class="bg-gray-800 border border-gray-700 rounded-lg p-8 text-center">
+    //       <BookOpen class="w-16 h-16 text-gray-400 mx-auto mb-4" />
+    //       <h3 class="text-lg font-medium text-gray-200 mb-2">EPUB Viewer</h3>
+    //       <p class="text-gray-400 mb-4">
+    //         EPUB viewing is not yet fully implemented.
+    //       </p>
+    //       <a href={pdfDocument.cloudinary_url} target="_blank" class="btn-primary inline-flex items-center space-x-2">
+    //         <Download class="w-4 h-4" />
+    //         <span>Download EPUB</span>
+    //       </a>
+    //     </div>
+    //   {/if}
+    // {/if}
+  // }
+  
+  // Make functions available globally for the HTML buttons
+  if (browser) {
+    window.nextPage = nextPage;
+    window.prevPage = prevPage;
+    window.zoomIn = zoomIn;
+    window.zoomOut = zoomOut;
   }
 </script>
 
 <svelte:head>
-  <title>{document?.title || 'Document'} - PKMS</title>
+  <title>{pdfDocument?.title || 'Document'} - PKMS</title>
 </svelte:head>
 
 <div class="space-y-6">
@@ -196,13 +446,13 @@
       </a>
       <div>
         <h1 class="text-2xl font-bold text-gray-200">
-          {document?.title || 'Loading...'}
+          {pdfDocument?.title || 'Loading...'}
         </h1>
-        {#if document}
+        {#if pdfDocument}
           <p class="text-gray-400 text-sm">
-            {document.original_filename} • {document.file_type.toUpperCase()}
-            {#if document.document_highlights?.length}
-              • {document.document_highlights.length} highlights
+            {pdfDocument.original_filename} • {pdfDocument.file_type.toUpperCase()}
+            {#if pdfDocument.document_highlights?.length}
+              • {pdfDocument.document_highlights.length} highlights
             {/if}
           </p>
         {/if}
@@ -210,34 +460,36 @@
     </div>
     
     <div class="flex items-center space-x-3">
-      <button
-        on:click={toggleHighlightMode}
-        class="btn-secondary flex items-center space-x-2 {$highlightMode ? ' text-white' : ''}"
-      >
-        {#if $highlightMode}
-          <EyeOff class="w-4 h-4" />
-          <span>Exit Highlight Mode</span>
-        {:else}
-          <HighlighterIcon class="w-4 h-4" />
-          <span>Highlight Mode</span>
-        {/if}
-      </button>
+      {#if pdfDocument?.file_type === 'pdf'}
+        <button
+          on:click={toggleAddToHighlightsMode}
+          class="btn-secondary flex items-center space-x-2 {isAddToHighlightsMode ? 'bg-yellow-600 text-white' : ''}"
+        >
+          {#if isAddToHighlightsMode}
+            <EyeOff class="w-4 h-4" />
+            <span>Exit Add to Highlights</span>
+          {:else}
+            <Plus class="w-4 h-4" />
+            <span>Add to Highlights</span>
+          {/if}
+        </button>
+      {/if}
       
       <a href="/documents/{documentId}/highlights" class="btn-secondary flex items-center space-x-2">
         <Eye class="w-4 h-4" />
-        <span>View Highlights</span>
+        <span>View All Highlights</span>
       </a>
     </div>
   </div>
   
-  <!-- Highlight Mode Notice -->
-  {#if $highlightMode}
-    <div class=" border border-yellow-700 rounded-lg p-4">
+  <!-- Add to Highlights Mode Notice -->
+  {#if isAddToHighlightsMode}
+    <div class="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4">
       <div class="flex items-center space-x-3">
-        <HighlighterIcon class="w-5 h-5 text-yellow-400" />
+        <Plus class="w-5 h-5 text-yellow-400" />
         <div>
-          <p class="text-yellow-200 font-medium">Highlight Mode Active</p>
-          <p class="text-yellow-300 text-sm">Select text in the document to create highlights</p>
+          <p class="text-yellow-200 font-medium">Add to Highlights Mode Active</p>
+          <p class="text-yellow-300 text-sm">Click and drag to select text in the document, then add it to your highlights</p>
         </div>
       </div>
     </div>
@@ -264,30 +516,83 @@
         <span>Loading document...</span>
       </div>
     </div>
-  {:else if document}
+  {:else if pdfDocument}
     <!-- Document Viewer -->
     <div class="relative">
-      {@html renderDocumentViewer()}
+      {#if pdfDocument}
+      {#if pdfDocument.file_type === 'pdf'}
+        <div class="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden">
+          <!-- PDF Controls -->
+          <div class="bg-gray-800 px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+              <div class="flex items-center space-x-2">
+                <button on:click={prevPage} class="p-2 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded">
+                  ←
+                </button>
+                <span class="text-sm text-gray-300">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button on:click={nextPage} class="p-2 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded">
+                  →
+                </button>
+              </div>
+              
+              <div class="flex items-center space-x-2">
+                <button on:click={zoomOut} class="p-2 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded">
+                  <ZoomOut class="w-4 h-4" />
+                </button>
+                <span class="text-sm text-gray-300">{Math.round(scale * 100)}%</span>
+                <button on:click={zoomIn} class="p-2 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded">
+                  <ZoomIn class="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          
+          <div class="p-4 bg-gray-900 overflow-auto max-h-[800px]">
+            <div class="flex justify-center">
+              <canvas id="pdf-canvas" bind:this={canvasElement} class="border border-gray-600 shadow-lg max-w-full"></canvas>
+            </div>
+          </div>
+        </div>
+      {:else if pdfDocument.file_type === 'epub'}
+        <div class="bg-gray-800 border border-gray-700 rounded-lg p-8 text-center">
+          <BookOpen class="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 class="text-lg font-medium text-gray-200 mb-2">EPUB Viewer</h3>
+          <p class="text-gray-400 mb-4">
+            EPUB viewing is not yet fully implemented.
+          </p>
+          <a href={pdfDocument.cloudinary_url} target="_blank" class="btn-primary inline-flex items-center space-x-2">
+            <Download class="w-4 h-4" />
+            <span>Download EPUB</span>
+          </a>
+        </div>
+      {/if}
+    {/if}
     </div>
   {/if}
 </div>
 
-<!-- Highlight Creation Panel -->
-{#if showHighlightPanel && selectedText}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" on:click={hideHighlightPanel}>
-    <div class="bg-gray-800 border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" on:click|stopPropagation>
-      <h3 class="text-lg font-medium text-gray-200 mb-4">Create Highlight</h3>
+<!-- Highlight Preview Panel -->
+{#if showHighlightPreview && selectedTextInfo}
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" on:click={hideHighlightPreview}>
+    <div class="bg-gray-800 border border-gray-700 rounded-lg p-6 max-w-lg w-full mx-4" on:click|stopPropagation>
+      <h3 class="text-lg font-medium text-gray-200 mb-4">Add to Highlights</h3>
       
       <!-- Selected Text Preview -->
       <div class="bg-gray-700 rounded-lg p-4 mb-4">
+        <div class="text-xs text-gray-400 mb-2">
+          Page {selectedTextInfo.page} of {selectedTextInfo.totalPages}
+        </div>
         <p class="text-gray-300 text-sm leading-relaxed">
-          "{selectedText.text}"
+          "{selectedTextInfo.text}"
         </p>
       </div>
       
       <!-- Color Selection -->
       <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-200 mb-2">Color</label>
+        <label class="block text-sm font-medium text-gray-200 mb-2">Highlight Color</label>
         <div class="flex space-x-2">
           {#each highlightColors as color}
             <button
@@ -337,7 +642,7 @@
       <!-- Actions -->
       <div class="flex items-center justify-end space-x-3">
         <button
-          on:click={hideHighlightPanel}
+          on:click={hideHighlightPreview}
           class="btn-secondary"
         >
           Cancel
@@ -350,27 +655,13 @@
         >
           {#if isCreatingHighlight}
             <Loader2 class="w-4 h-4 animate-spin" />
-            <span>Creating...</span>
+            <span>Adding...</span>
           {:else}
             <Plus class="w-4 h-4" />
-            <span>Create Highlight</span>
+            <span>Add to Highlights</span>
           {/if}
         </button>
       </div>
     </div>
   </div>
 {/if}
-
-<style>
-  /* .btn-primary {
-    @apply bg-yellow-600 hover:bg-yellow-700 text-white font-medium px-4 py-2 rounded-lg transition-colors;
-  }
-  
-  .btn-secondary {
-    @apply bg-gray-700 hover:bg-gray-600 text-gray-200 font-medium px-4 py-2 rounded-lg transition-colors;
-  }
-  
-  .card {
-    @apply bg-gray-800 border border-gray-700 rounded-lg;
-  } */
-</style>
