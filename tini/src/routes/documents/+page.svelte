@@ -229,20 +229,3 @@
   {/if}
 </div>
 
-<style>
-  /* .btn-primary {
-    @apply bg-yellow-600 hover:bg-yellow-700 text-white font-medium px-4 py-2 rounded-lg transition-colors;
-  }
-  
-  .btn-secondary {
-    @apply bg-gray-700 hover:bg-gray-600 text-gray-200 font-medium px-4 py-2 rounded-lg transition-colors;
-  }
-  
-  .btn-danger {
-    @apply bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg transition-colors;
-  }
-  
-  .card {
-    @apply bg-gray-800 border border-gray-700 rounded-lg;
-  } */
-</style>

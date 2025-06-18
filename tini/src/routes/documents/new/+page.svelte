@@ -3,7 +3,7 @@
   import { goto } from '$app/navigation';
   import { Upload, FileText, AlertCircle, CheckCircle, X } from 'lucide-svelte';
   import { uploadDocument } from '$lib/api/document';
-    import { isValidDocumentFile, validateFileSize, getFileType, formatFileSize } from '$lib/api/utils/document';
+  import { isValidDocumentFile, validateFileSize, getFileType, formatFileSize } from '$lib/api/utils/document';
 
   
   let title = '';

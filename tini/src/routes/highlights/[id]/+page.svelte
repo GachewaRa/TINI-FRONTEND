@@ -148,7 +148,7 @@
   
   function handleCreateNote() {
     if (selectedText && highlight) {
-      console.log('Opening create note modal');
+      // console.log('Opening create note modal');
       showCreateNoteModal = true;
       
       // Temporarily disable selection handling while modal is open
@@ -162,7 +162,7 @@
     console.log('Note created event received:', event.detail);
     const newNote = event.detail;
     notes.update(current => {
-      console.log('Updating notes store, current count:', current.length);
+      // console.log('Updating notes store, current count:', current.length);
       return [...current, newNote];
     });
     

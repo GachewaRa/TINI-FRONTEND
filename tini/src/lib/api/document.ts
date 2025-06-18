@@ -3,7 +3,8 @@ import type {
   Document, 
   DocumentHighlight, 
   CreateDocumentHighlightRequest,
-  DocumentUploadRequest 
+  DocumentUploadRequest,
+  TextSelection 
 } from '$lib/types/document';
 
 const API_BASE = 'http://127.0.0.1:8000/api/v1';
@@ -29,12 +30,31 @@ export async function fetchDocument(id: string): Promise<Document> {
   const data = await response.json();
   return {
     ...data,
-    upload_date: new Date(data.upload_date),
-    document_highlights: data.document_highlights?.map((h: any) => ({
-      ...h,
-      highlight_date: new Date(h.highlight_date)
-    })) || []
+    upload_date: new Date(data.upload_date)
   };
+}
+
+export async function fetchDocumentContent(id: string): Promise<string> {
+  const response = await fetch(`${API_BASE}/documents/${id}/content`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch document content: ${response.statusText}`);
+  }
+  
+  const contentType = response.headers.get('content-type');
+  if (contentType?.includes('application/json')) {
+    const data = await response.json();
+    return data.content || data.html_content || '';
+  }
+  
+  return await response.text();
+}
+
+export async function fetchDocumentStatus(id: string): Promise<{ status: string; message?: string }> {
+  const response = await fetch(`${API_BASE}/documents/${id}/status`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch document status: ${response.statusText}`);
+  }
+  return await response.json();
 }
 
 export async function uploadDocument(request: DocumentUploadRequest): Promise<Document> {
@@ -69,34 +89,61 @@ export async function deleteDocument(id: string): Promise<void> {
 }
 
 // Document Highlights API
-export async function fetchDocumentHighlights(): Promise<DocumentHighlight[]> {
-  const response = await fetch(`${API_BASE}/documents/highlights`);
+export async function fetchDocumentHighlights(documentId: string, pageNumber?: number, color?: string): Promise<DocumentHighlight[]> {
+  const params = new URLSearchParams();
+  if (pageNumber) params.append('page_number', pageNumber.toString());
+  if (color) params.append('color', color);
+  
+  const response = await fetch(`${API_BASE}/documents/${documentId}/highlights${params.toString() ? '?' + params.toString() : ''}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch highlights: ${response.statusText}`);
   }
   const data = await response.json();
   return data.map((highlight: any) => ({
     ...highlight,
-    highlight_date: new Date(highlight.highlight_date)
+    highlight_date: new Date(highlight.highlight_date),
+    created_at: new Date(highlight.created_at),
+    updated_at: new Date(highlight.updated_at)
   }));
 }
 
-export async function fetchDocumentHighlight(id: string): Promise<DocumentHighlight> {
-  const response = await fetch(`${API_BASE}/documents/highlights/${id}`);
+export async function createHighlightFromSelection(
+  documentId: string,
+  selection: TextSelection,
+  color: string = '#ffff00',
+  userNote?: string
+): Promise<DocumentHighlight> {
+  const response = await fetch(`${API_BASE}/documents/${documentId}/highlights/from-selection`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      ...selection,
+      color,
+      user_note: userNote
+    })
+  });
+
   if (!response.ok) {
-    throw new Error(`Failed to fetch highlight: ${response.statusText}`);
+    const error = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new Error(error.detail || 'Failed to create highlight');
   }
+
   const data = await response.json();
   return {
     ...data,
-    highlight_date: new Date(data.highlight_date)
+    highlight_date: new Date(data.highlight_date),
+    created_at: new Date(data.created_at),
+    updated_at: new Date(data.updated_at)
   };
 }
 
 export async function createDocumentHighlight(
+  documentId: string,
   request: CreateDocumentHighlightRequest
 ): Promise<DocumentHighlight> {
-  const response = await fetch(`${API_BASE}/documents/highlights`, {
+  const response = await fetch(`${API_BASE}/documents/${documentId}/highlights`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -112,7 +159,9 @@ export async function createDocumentHighlight(
   const data = await response.json();
   return {
     ...data,
-    highlight_date: new Date(data.highlight_date)
+    highlight_date: new Date(data.highlight_date),
+    created_at: new Date(data.created_at),
+    updated_at: new Date(data.updated_at)
   };
 }
 
@@ -136,7 +185,9 @@ export async function updateDocumentHighlight(
   const data = await response.json();
   return {
     ...data,
-    highlight_date: new Date(data.highlight_date)
+    highlight_date: new Date(data.highlight_date),
+    created_at: new Date(data.created_at),
+    updated_at: new Date(data.updated_at)
   };
 }
 
@@ -158,6 +209,8 @@ export async function searchDocumentHighlights(query: string): Promise<DocumentH
   const data = await response.json();
   return data.map((highlight: any) => ({
     ...highlight,
-    highlight_date: new Date(highlight.highlight_date)
+    highlight_date: new Date(highlight.highlight_date),
+    created_at: new Date(highlight.created_at),
+    updated_at: new Date(highlight.updated_at)
   }));
 }
