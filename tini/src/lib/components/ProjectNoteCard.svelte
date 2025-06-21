@@ -56,6 +56,12 @@
   function formatDate(date: string | Date): string {
     return new Date(date).toLocaleDateString();
   }
+
+  let showFullContent = false;
+
+  function toggleContent() {
+    showFullContent = !showFullContent;
+  }
 </script>
 
 <div 
@@ -127,11 +133,31 @@
       <span class="font-medium">Source:</span> {note.source}
     </p>
 
+
     <!-- Content Preview -->
-    <div class="text-gray-300 line-clamp-3" 
-         class:text-xs={compact}
-         class:text-sm={!compact}>
-      {truncateContent(note.content, compact ? 120 : 150)}
+    <div class="text-gray-300" 
+        class:text-xs={compact}
+        class:text-sm={!compact}>
+      {#if showFullContent}
+        <div class="whitespace-pre-wrap">
+          {@html note.content}
+        </div>
+      {:else}
+        <div class="line-clamp-3">
+          {truncateContent(note.content, compact ? 120 : 150)}
+        </div>
+      {/if}
+      
+      <!-- Show more/less button -->
+      {#if note.content.replace(/<[^>]*>/g, '').length > (compact ? 120 : 150)}
+        <button
+          type="button"
+          on:click|stopPropagation={toggleContent}
+          class="text-yellow-500 hover:text-yellow-400 transition-colors mt-1 text-xs font-medium underline"
+        >
+          {showFullContent ? 'Show less' : 'Show more'}
+        </button>
+      {/if}
     </div>
 
     <!-- Tags -->

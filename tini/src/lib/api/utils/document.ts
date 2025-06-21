@@ -1,15 +1,15 @@
 // src/lib/utils/document.ts
 // import type { TextSelection } from '$lib/types/document';
 
-// export function formatFileSize(bytes: number): string {
-//   if (bytes === 0) return '0 B';
+export function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 B';
   
-//   const k = 1024;
-//   const sizes = ['B', 'KB', 'MB', 'GB'];
-//   const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
   
-//   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-// }
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
 
 export function validateFileSize(file: File, maxSizeMB: number = 5): boolean {
   const maxSizeBytes = maxSizeMB * 1024 * 1024;
@@ -98,14 +98,14 @@ export function isValidDocumentFile(file: File): boolean {
 
 // src/lib/utils/document.ts
 
-export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 B';
+// export function formatFileSize(bytes: number): string {
+//   if (bytes === 0) return '0 B';
   
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+//   const sizes = ['B', 'KB', 'MB', 'GB'];
+//   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   
-  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
-}
+//   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
+// }
 
 export function getFileTypeIcon(fileType: string): string {
   switch (fileType.toLowerCase()) {
