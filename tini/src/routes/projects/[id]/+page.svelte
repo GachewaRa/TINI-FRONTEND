@@ -44,12 +44,6 @@
   $: visibleNotes = relatedNotes.filter(note => !hiddenNoteIds.has(note.id));
   $: hiddenNotes = relatedNotes.filter(note => hiddenNoteIds.has(note.id));
 
-  // Debug reactive statements
-  $: if (project) {
-    console.log('Project updated:', project.id, 'Hidden IDs:', project.hidden_note_ids);
-    console.log('Visible notes:', visibleNotes.length, 'Hidden notes:', hiddenNotes.length);
-  }
-
   const statusOptions = [
     { value: 'ACTIVE', label: 'Active', description: 'Currently working on' },
     { value: 'COMPLETED', label: 'Completed', description: 'Finished project' },
@@ -111,13 +105,10 @@
         
         if (!foundProject) {
             // If not in store, fetch from API and add to store
-            console.log('Project not in store, fetching from API...');
             const apiProject = await ProjectsAPI.getProject(projectId);
             foundProject = projectsStore.updateProject(apiProject);
         }
 
-        // At this point, the reactive statements should handle the rest
-        console.log('Project loaded:', foundProject, 'Hidden note IDs:', foundProject.hidden_note_ids);
         
     } catch (error) {
         console.error('Failed to load project:', error);
@@ -194,7 +185,7 @@
       // Update the store - this will trigger all reactive statements
       // console.log("UPDATED PROJECT AFTER HIDING NOTE: ", updatedProject)
       projectsStore.updateProject(updatedProject);
-      console.log('NOTES HIDDEN IN UPDATED PROJECT:', updatedProject.hidden_note_ids);
+   
     } catch (error) {
       console.error('Error hiding note:', error);
       errors.submit = error instanceof Error ? error.message : 'Failed to hide note';
@@ -212,7 +203,6 @@
       const updatedProject = await ProjectsAPI.unhideNoteInProject(project.id, noteId);
       // Update the store - this will trigger all reactive statements
       projectsStore.updateProject(updatedProject);
-      console.log('NOTES UNHIDDEN:', updatedProject.hidden_note_ids);
     } catch (error) {
       console.error('Error unhiding note:', error);
       errors.submit = error instanceof Error ? error.message : 'Failed to unhide note';
@@ -258,6 +248,62 @@
         return 'text-gray-400 bg-gray-400/10 border-gray-400/20';
     }
   }
+
+ async function handleInjectNotes() {
+  if (!project || relatedNotes.length === 0) return;
+
+  try {
+    // Create formatted content from notes
+    const notesContent = relatedNotes.map(note => {
+      const cleanContent = note.content.replace(/<[^>]*>/g, ''); // Strip HTML tags
+      return `${note.title}
+
+Source: ${note.source}
+
+${cleanContent}
+
+---
+      `.trim();
+    }).join('\n\n');
+
+    const finalContent = `📝 Injected Notes (${relatedNotes.length} notes)
+=========================================
+
+${notesContent}`;
+
+    // Copy to clipboard
+    await navigator.clipboard.writeText(finalContent);
+    
+    // Optional: Show a brief success indicator
+    console.log('Notes copied to clipboard!');
+    
+  } catch (error) {
+    console.error('Failed to copy to clipboard:', error);
+    // Fallback for older browsers
+    fallbackCopyToClipboard(finalContent);
+  }
+}
+
+// Fallback function for browsers that don't support navigator.clipboard
+function fallbackCopyToClipboard(text) {
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+  textArea.style.position = 'fixed';
+  textArea.style.left = '-999999px';
+  textArea.style.top = '-999999px';
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  
+  try {
+    document.execCommand('copy');
+    console.log('Notes copied to clipboard (fallback)!');
+  } catch (err) {
+    console.error('Fallback copy failed:', err);
+  }
+  
+  document.body.removeChild(textArea);
+}
 </script>
 
 <svelte:head>
@@ -451,6 +497,19 @@
             <span class="text-xs text-gray-400 bg-gray-800 px-2 py-1 rounded">
               {visibleNotes.length}/{relatedNotes.length}
             </span>
+            
+            <!-- Inject Notes Button -->
+            {#if relatedNotes.length > 0}
+              <button
+                type="button"
+                on:click={handleInjectNotes}
+                class="p-1 text-gray-400 hover:text-yellow-400 transition-colors"
+                title="Copy all notes to clipboard"
+              >
+                <FileText class="w-3 h-3" />
+              </button>
+            {/if}
+            
             {#if hiddenNotes.length > 0}
               <button
                 type="button"
