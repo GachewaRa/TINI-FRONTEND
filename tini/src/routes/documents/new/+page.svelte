@@ -39,13 +39,13 @@
     
     // Validate file type
     if (!isValidDocumentFile(file)) {
-      error = 'Please select a valid PDF or EPUB file';
+      error = 'Please select a valid HTML or EPUB file';
       return;
     }
     
     // Validate file size (5MB limit)
-    if (!validateFileSize(file, 5)) {
-      error = 'File size must be less than 5MB';
+    if (!validateFileSize(file, 10)) {
+      error = 'File size must be less than 10MB';
       return;
     }
     
@@ -53,7 +53,7 @@
     
     // Auto-generate title from filename if not set
     if (!title) {
-      title = file.name.replace(/\.(pdf|epub)$/i, '');
+      title = file.name.replace(/\.(html|epub)$/i, '');
     }
   }
   
@@ -122,7 +122,7 @@
   <div class="text-center">
     <h1 class="text-3xl font-bold text-gray-200 mb-2">Upload Document</h1>
     <p class="text-gray-400">
-      Upload PDF or EPUB files to your personal knowledge management system
+      Upload HTML or EPUB files to your personal knowledge management system
     </p>
   </div>
   
@@ -192,7 +192,7 @@
               </button>
             </p>
             <p class="text-gray-400 text-sm">
-              Supports PDF and EPUB files up to 5MB
+              Supports HTML and EPUB files up to 10MB
             </p>
             
             <input
@@ -262,11 +262,11 @@
     <ul class="space-y-2 text-gray-400">
       <li class="flex items-start space-x-2">
         <span class="text-yellow-600 mt-1">•</span>
-        <span>Supported formats: PDF and EPUB files only</span>
+        <span>Supported formats: HTML and EPUB files only</span>
       </li>
       <li class="flex items-start space-x-2">
         <span class="text-yellow-600 mt-1">•</span>
-        <span>Maximum file size: 5MB per document</span>
+        <span>Maximum file size: 10MB per document</span>
       </li>
       <li class="flex items-start space-x-2">
         <span class="text-yellow-600 mt-1">•</span>

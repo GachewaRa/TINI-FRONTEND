@@ -11,32 +11,39 @@
     Loader2, 
     AlertCircle,
     FileText,
-    BookOpen 
+    BookOpen,
+    Play,
+    ZoomIn,
+    ZoomOut,
+    RotateCcw,
+    Settings,
+    Trash2
   } from 'lucide-svelte';
   
   import { 
     fetchDocument, 
     fetchDocumentContent, 
     fetchDocumentHighlights,
-    createHighlightFromSelection
+    createHighlightFromSelection,
+    deleteDocument
   } from '$lib/api/document';
   
   import HighlightModal from '$lib/components/HighlightModal.svelte';
   import DocumentStatus from '$lib/components/DocumentStatus.svelte';
-  
-  // import { getTextSelection, applyHighlights, clearSelection, type SelectionInfo } from '$api/utils/textSelection';
-  
   import type { Document, DocumentHighlight, TextSelection } from '$lib/types/document';
-    import { applyHighlights, clearSelection, getTextSelection, type SelectionInfo } from '$lib/api/utils/textSelection';
-    import { browser } from '$app/environment';
+  import { applyHighlights, clearSelection, getTextSelection, type SelectionInfo } from '$lib/api/utils/textSelection';
+  import { browser } from '$app/environment';
+    import EpubRenderer from '$lib/components/EpubRenderer.svelte';
 
   // Component state
   let userDocument: Document | null = null;
   let documentContent = '';
+  let rawContent = '';
   let highlights: DocumentHighlight[] = [];
   let isLoading = true;
   let isLoadingContent = false;
   let isCreatingHighlight = false;
+  let isDeleting = false;
   let error = '';
   let contentError = '';
 
@@ -45,6 +52,17 @@
   let showHighlightModal = false;
   let currentSelection: SelectionInfo | null = null;
   let hasTextSelection = false;
+
+  // Display controls
+  let zoomLevel = 100;
+  let showDisplayControls = false;
+  let fontFamily = 'system';
+  let lineHeight = 1.6;
+  let maxWidth = 'max-w-4xl';
+
+  // Document viewer container
+  let viewerContainer: HTMLElement;
+  let contentContainer: HTMLElement;
 
   // Get document ID from URL
   $: documentId = $page.params.id;
@@ -67,16 +85,12 @@
       
       // Load document metadata
       userDocument = await fetchDocument(documentId);
-      console.log("FETCHED DOCUMENT: ", userDocument)
+      console.log("FETCHED DOCUMENT: ", userDocument);
+      
       // Load highlights
       highlights = await fetchDocumentHighlights(documentId);
       
-      // Load content if document is ready
-      if (userDocument.file_type === 'epub' || 
-          (userDocument.file_type === 'pdf' && userDocument.is_html_ready)) {
-        await loadDocumentContent();
-      }
-      
+      await loadDocumentContent();
     } catch (err) {
       console.error('Error loading document:', err);
       error = err instanceof Error ? err.message : 'Failed to load document';
@@ -93,9 +107,17 @@
       contentError = '';
       
       const content = await fetchDocumentContent(userDocument.id);
+      rawContent = content;
+      
+      // Process content based on file type
+      if (userDocument.file_type === 'html') {
+        documentContent = processHtmlContent(content);
+      } else if (userDocument.file_type === 'epub') {
+        documentContent = await processEpubContent(content);
+      }
       
       // Apply existing highlights to content
-      documentContent = applyHighlights(content, highlights.map(h => ({
+      documentContent = applyHighlights(documentContent, highlights.map(h => ({
         id: h.id,
         color: h.color,
         selected_text: h.selected_text
@@ -109,15 +131,51 @@
     }
   }
 
+  function processHtmlContent(content: string): string {
+    // Clean up HTML content, ensure proper structure
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(content, 'text/html');
+    
+    // Add unique IDs to elements for text selection
+    const elements = doc.querySelectorAll('p, div, span, h1, h2, h3, h4, h5, h6');
+    elements.forEach((el, index) => {
+      if (!el.id) {
+        el.id = `content-${index}`;
+      }
+    });
+    
+    return doc.body.innerHTML;
+  }
+
+  async function processEpubContent(content: string): Promise<string> {
+    // For EPUB, we'll need to extract and process the content
+    // This is a simplified approach - you might want to use a proper EPUB parser
+    try {
+      // If content is already HTML (extracted from EPUB), process it
+      if (content.includes('<html') || content.includes('<body')) {
+        return processHtmlContent(content);
+      }
+      
+      // If it's raw EPUB data, you'd need to parse it properly
+      // For now, treat it as text and wrap in basic HTML
+      return `<div class="epub-content">${content.replace(/\n/g, '<br>')}</div>`;
+    } catch (err) {
+      console.error('Error processing EPUB content:', err);
+      return `<div class="epub-content">${content}</div>`;
+    }
+  }
+
   function setupSelectionListener() {
-    document.addEventListener('mouseup', handleTextSelection);
-    document.addEventListener('keyup', handleTextSelection);
+    if (browser) {
+      document.addEventListener('mouseup', handleTextSelection);
+      document.addEventListener('keyup', handleTextSelection);
+    }
   }
 
   function cleanupSelectionListener() {
     if (browser) {
-      document.addEventListener('mouseup', handleTextSelection);
-      document.addEventListener('keyup', handleTextSelection);
+      document.removeEventListener('mouseup', handleTextSelection);
+      document.removeEventListener('keyup', handleTextSelection);
     }
   }
 
@@ -203,16 +261,31 @@
     }
   }
 
-  function handleStatusChange(newStatus: string) {
-    if (userDocument) {
-      userDocument.processing_status = newStatus;
-      userDocument.is_html_ready = newStatus === 'COMPLETED';
-      
-      // Load content if processing completed
-      if (newStatus === 'COMPLETED') {
-        loadDocumentContent();
-      }
+  async function handleDeleteDocument() {
+    if (!userDocument || !confirm('Are you sure you want to delete this document?')) return;
+    
+    try {
+      isDeleting = true;
+      await deleteDocument(userDocument.id);
+      goto('/documents');
+    } catch (err) {
+      console.error('Error deleting document:', err);
+      // Show error toast
+    } finally {
+      isDeleting = false;
     }
+  }
+
+  function adjustZoom(delta: number) {
+    zoomLevel = Math.max(50, Math.min(200, zoomLevel + delta));
+  }
+
+  function resetZoom() {
+    zoomLevel = 100;
+  }
+
+  function toggleDisplayControls() {
+    showDisplayControls = !showDisplayControls;
   }
 
   function goToHighlights() {
@@ -224,13 +297,14 @@
   }
 
   // Computed properties
-  $: canHighlight = userDocument && (
-    userDocument.file_type === 'epub' || 
-    (userDocument.file_type === 'pdf' && userDocument.is_html_ready)
-  );
-
+  $: canHighlight = userDocument && documentContent;
   $: showContent = canHighlight && documentContent && !isLoadingContent;
-  $: showProcessingStatus = userDocument?.file_type === 'pdf' && !userDocument.is_html_ready;
+  $: zoomStyle = `transform: scale(${zoomLevel / 100}); transform-origin: top left;`;
+  $: contentStyle = `
+    ${zoomStyle}
+    font-family: ${fontFamily === 'serif' ? 'Georgia, serif' : fontFamily === 'mono' ? 'Monaco, monospace' : 'system-ui, sans-serif'};
+    line-height: ${lineHeight};
+  `;
 </script>
 
 <svelte:head>
@@ -258,7 +332,7 @@
             </h1>
             <div class="flex items-center space-x-3 text-sm text-gray-400 mt-1">
               <span class="flex items-center space-x-1">
-                {#if userDocument.file_type === 'pdf'}
+                {#if userDocument.file_type === 'html'}
                   <FileText class="w-4 h-4" />
                 {:else}
                   <BookOpen class="w-4 h-4" />
@@ -279,6 +353,91 @@
       <!-- Right: Action buttons -->
       <div class="flex items-center space-x-3">
         {#if canHighlight}
+          <!-- Display Controls -->
+          <div class="relative">
+            <button
+              on:click={toggleDisplayControls}
+              class="flex items-center space-x-2 px-3 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors"
+            >
+              <Settings class="w-4 h-4" />
+              <span class="hidden sm:inline">Display</span>
+            </button>
+            
+            {#if showDisplayControls}
+              <div class="absolute right-0 top-full mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-lg p-4 z-40">
+                <!-- Zoom Controls -->
+                <div class="mb-4">
+                  <label class="block text-sm font-medium text-gray-300 mb-2">Zoom: {zoomLevel}%</label>
+                  <div class="flex items-center space-x-2">
+                    <button
+                      on:click={() => adjustZoom(-10)}
+                      class="p-1 bg-gray-700 text-gray-300 rounded hover:bg-gray-600"
+                    >
+                      <ZoomOut class="w-4 h-4" />
+                    </button>
+                    <button
+                      on:click={resetZoom}
+                      class="p-1 bg-gray-700 text-gray-300 rounded hover:bg-gray-600"
+                    >
+                      <RotateCcw class="w-4 h-4" />
+                    </button>
+                    <button
+                      on:click={() => adjustZoom(10)}
+                      class="p-1 bg-gray-700 text-gray-300 rounded hover:bg-gray-600"
+                    >
+                      <ZoomIn class="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Font Family -->
+                <div class="mb-4">
+                  <label class="block text-sm font-medium text-gray-300 mb-2">Font</label>
+                  <select
+                    bind:value={fontFamily}
+                    class="w-full px-3 py-2 bg-gray-700 text-gray-300 rounded-lg border border-gray-600"
+                  >
+                    <option value="system">System</option>
+                    <option value="serif">Serif</option>
+                    <option value="mono">Monospace</option>
+                  </select>
+                </div>
+
+                <!-- Line Height -->
+                <div class="mb-4">
+                  <label class="block text-sm font-medium text-gray-300 mb-2">Line Height</label>
+                  <input
+                    type="range"
+                    min="1.2"
+                    max="2.0"
+                    step="0.1"
+                    bind:value={lineHeight}
+                    class="w-full"
+                  />
+                  <div class="flex justify-between text-xs text-gray-400 mt-1">
+                    <span>Tight</span>
+                    <span>Normal</span>
+                    <span>Loose</span>
+                  </div>
+                </div>
+
+                <!-- Max Width -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-300 mb-2">Width</label>
+                  <select
+                    bind:value={maxWidth}
+                    class="w-full px-3 py-2 bg-gray-700 text-gray-300 rounded-lg border border-gray-600"
+                  >
+                    <option value="max-w-2xl">Narrow</option>
+                    <option value="max-w-4xl">Medium</option>
+                    <option value="max-w-6xl">Wide</option>
+                    <option value="max-w-full">Full</option>
+                  </select>
+                </div>
+              </div>
+            {/if}
+          </div>
+
           <!-- Highlight Mode Toggle -->
           <button
             on:click={toggleHighlightMode}
@@ -335,12 +494,31 @@
             <span class="hidden sm:inline">Download</span>
           </a>
         {/if}
+
+        <!-- Delete Button -->
+        {#if userDocument}
+          <button
+            on:click={handleDeleteDocument}
+            disabled={isDeleting}
+            class="flex items-center space-x-2 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+            title="Delete document"
+          >
+            {#if isDeleting}
+              <Loader2 class="w-4 h-4 animate-spin" />
+            {:else}
+              <Trash2 class="w-4 h-4" />
+            {/if}
+            <span class="hidden sm:inline">
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </span>
+          </button>
+        {/if}
       </div>
     </div>
   </div>
 
   <!-- Main Content -->
-  <div class="max-w-7xl mx-auto px-6 py-8">
+  <div class="max-w-7xl mx-auto px-6 py-8" bind:this={viewerContainer}>
     {#if isLoading}
       <!-- Loading State -->
       <div class="flex items-center justify-center py-12">
@@ -366,14 +544,6 @@
 
     {:else if userDocument}
       <div class="space-y-6">
-        <!-- Processing Status (for PDFs) -->
-        {#if showProcessingStatus}
-          <DocumentStatus 
-            {userDocument} 
-            onStatusChange={handleStatusChange}
-          />
-        {/if}
-
         <!-- Document Content -->
         {#if isLoadingContent}
           <div class="flex items-center justify-center py-12">
@@ -398,34 +568,29 @@
 
         {:else if showContent}
           <!-- Document Content Display -->
-          <div class="bg-white rounded-lg shadow-lg overflow-hidden">
-            <div 
-              class="prose prose-lg max-w-none p-8 document-content"
-              class:highlight-mode={isHighlightMode}
-              bind:innerHTML={documentContent}
-              contenteditable="true"
-            ></div>
-          </div>
-
-        {:else if !canHighlight}
-          <!-- File Type Not Supported for Highlighting -->
-          <div class="card p-8 text-center">
-            <FileText class="w-12 h-12 text-gray-600 mx-auto mb-4" />
-            <h3 class="text-lg font-medium text-gray-200 mb-2">Preview Not Available</h3>
-            <p class="text-gray-400 mb-6">
-              This document type doesn't support in-browser highlighting yet.
-              You can still download the original file.
-            </p>
-            <a
-              href={userDocument.cloudinary_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="btn-primary inline-flex items-center space-x-2"
-            >
-              <Download class="w-4 h-4" />
-              <span>Download Original File</span>
-            </a>
-          </div>
+          {#if userDocument.file_type === 'epub'}
+            <!-- EPUB Renderer -->
+            <EpubRenderer
+              epubContent={rawContent}
+              {highlights}
+              {isHighlightMode}
+              {zoomLevel}
+              {fontFamily}
+              {lineHeight}
+              on:textSelection={handleTextSelection}
+            />
+          {:else}
+            <!-- HTML Renderer -->
+            <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+              <div 
+                class="prose prose-lg {maxWidth} mx-auto p-8 document-content"
+                class:highlight-mode={isHighlightMode}
+                style={contentStyle}
+                bind:this={contentContainer}
+                
+              ></div>
+            </div>
+          {/if}
         {/if}
       </div>
     {/if}
@@ -453,51 +618,37 @@
 />
 
 <style>
-  :global(.document-content) {
-    line-height: 1.7;
-    color: #1f2937;
-  }
-
-  :global(.document-content.highlight-mode) {
-    cursor: text;
+  .document-content {
     user-select: text;
-  }
-
-  :global(.document-content .highlight) {
-    padding: 2px 4px;
-    border-radius: 3px;
-    cursor: pointer;
     transition: all 0.2s ease;
   }
 
-  :global(.document-content .highlight:hover) {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    transform: translateY(-1px);
+  .document-content.highlight-mode {
+    cursor: text;
   }
 
-  :global(.document-content h1, .document-content h2, .document-content h3) {
-    color: #111827;
-    margin-top: 2rem;
-    margin-bottom: 1rem;
+  .document-content :global(.highlight) {
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: all 0.2s ease;
   }
 
-  :global(.document-content p) {
-    margin-bottom: 1rem;
+  .document-content :global(.highlight:hover) {
+    filter: brightness(1.1);
   }
 
-  :global(.document-content img) {
-    max-width: 100%;
-    height: auto;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  /* EPUB specific styles */
+  .document-content :global(.epub-content) {
+    max-width: none;
   }
 
-  /* Selection styling in highlight mode */
-  :global(.highlight-mode ::selection) {
-    background-color: rgba(255, 255, 0, 0.3);
+  /* Smooth zoom transition */
+  .document-content {
+    transition: transform 0.2s ease;
   }
 
-  :global(.highlight-mode ::-moz-selection) {
-    background-color: rgba(255, 255, 0, 0.3);
+  /* Hide display controls when clicking outside */
+  :global(body) {
+    overflow-x: auto;
   }
 </style>

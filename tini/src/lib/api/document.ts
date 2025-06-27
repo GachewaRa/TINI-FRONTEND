@@ -79,14 +79,31 @@ export async function uploadDocument(request: DocumentUploadRequest): Promise<Do
   };
 }
 
-export async function deleteDocument(id: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/documents/${id}`, {
-    method: 'DELETE'
+// export async function deleteDocument(id: string): Promise<void> {
+//   const response = await fetch(`${API_BASE}/documents/${id}`, {
+//     method: 'DELETE'
+//   });
+//   if (!response.ok) {
+//     throw new Error(`Failed to delete document: ${response.statusText}`);
+//   }
+// }
+
+// Add this function to your $lib/api/document.ts file
+
+export async function deleteDocument(documentId: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/documents/${documentId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+    },
   });
+
   if (!response.ok) {
-    throw new Error(`Failed to delete document: ${response.statusText}`);
+    const error = await response.json().catch(() => ({ detail: 'Failed to delete document' }));
+    throw new Error(error.detail || 'Failed to delete document');
   }
 }
+
 
 // Document Highlights API
 export async function fetchDocumentHighlights(documentId: string, pageNumber?: number, color?: string): Promise<DocumentHighlight[]> {

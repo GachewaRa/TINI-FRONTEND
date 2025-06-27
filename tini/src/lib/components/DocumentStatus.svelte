@@ -15,28 +15,28 @@
   let pollInterval: number | undefined;
 
   const statusConfig = {
-    UPLOADED: {
+    uploaded: {
       icon: Clock,
       color: 'text-blue-500',
       bgColor: 'bg-blue-500/20',
       title: 'Uploaded',
       description: 'Document uploaded successfully'
     },
-    PROCESSING: {
+    processing: {
       icon: Loader2,
       color: 'text-yellow-500',
       bgColor: 'bg-yellow-500/20',
       title: 'Processing',
       description: 'Converting document to HTML...'
     },
-    COMPLETED: {
+    processed: {
       icon: CheckCircle,
       color: 'text-green-500',
       bgColor: 'bg-green-500/20',
       title: 'Ready',
       description: 'Document is ready for viewing and highlighting'
     },
-    FAILED: {
+    failed: {
       icon: XCircle,
       color: 'text-red-500',
       bgColor: 'bg-red-500/20',
