@@ -1,9 +1,10 @@
-<!-- src/routes/notes/+page.svelte -->
+<!-- src/routes/notes/+page.svelte - Updated sections -->
 <script lang="ts">
   import { onMount } from 'svelte';
   import { Search, Plus, Filter, FolderPlus, FileText, X } from 'lucide-svelte';
   import NoteCard from '$lib/components/NoteCard.svelte';
   import SearchFilter from '$lib/components/SearchFilter.svelte';
+  import Pagination from '$lib/components/Pagination.svelte'; // New import
   import { notes, searchFilters } from '$lib/stores';
   import { NotesAPI } from '$lib/api/notes';
   import type { Note, Project} from '$lib/types';
@@ -14,9 +15,16 @@
   let isLoading = false;
   let error = '';
   
+  // Pagination state
+  let currentPage = 1;
+  let totalPages = 1;
+  let totalNotes = 0;
+  let hasNext = false;
+  let hasPrev = false;
+  let sortBy = 'newest';
+  
   // Project/Matter linking
   let availableProjects: Project[] = [];
-  // let availableMatters: Matter[] = [];
   let showProjectDropdown = false;
   let showMatterDropdown = false;
   let isLinkingToProject = false;
@@ -24,15 +32,29 @@
   
   onMount(async () => {
     await loadNotes();
-    // await loadProjectsAndMatters();
   });
   
-  async function loadNotes() {
+  async function loadNotes(page: number = 1) {
     try {
       isLoading = true;
       error = '';
-      const fetchedNotes = await NotesAPI.getNotes();
-      notes.set(fetchedNotes);
+      
+      const result = await NotesAPI.getNotes(page, 20, sortBy);
+      console.log("NORES RESPONSE OBJ:", result)
+      notes.set(result.notes);
+      currentPage = result.page;
+      totalPages = result.totalPages;
+      totalNotes = result.total;
+      hasNext = result.hasNext;
+      hasPrev = result.hasPrev;
+      
+      // Clear selection when changing pages
+      selectedNotes.clear();
+      selectedNotes = selectedNotes;
+      
+      // Scroll to top when page changes
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load notes';
       console.error('Error loading notes:', err);
@@ -41,16 +63,17 @@
     }
   }
   
-  // async function loadProjectsAndMatters() {
-  //   try {
-  //     [availableProjects, availableMatters] = await Promise.all([
-  //       NotesAPI.getProjects(),
-  //       // NotesAPI.getMatters()
-  //     ]);
-  //   } catch (err) {
-  //     console.error('Error loading projects/matters:', err);
-  //   }
-  // }
+  // Handle page changes
+  function handlePageChange(event: CustomEvent<{ page: number }>) {
+    loadNotes(event.detail.page);
+  }
+  
+  // Handle sort changes
+  async function handleSortChange(newSortBy: string) {
+    sortBy = newSortBy;
+    currentPage = 1; // Reset to first page when sorting
+    await loadNotes(1);
+  }
   
   function toggleNoteSelection(noteId: string) {
     if (selectedNotes.has(noteId)) {
@@ -76,8 +99,8 @@
       );
       await Promise.all(promises);
       
-      // Refresh notes to show updated relationships
-      await loadNotes();
+      // Refresh current page to show updated relationships
+      await loadNotes(currentPage);
       clearSelection();
       
       // Show success message
@@ -99,8 +122,8 @@
       );
       await Promise.all(promises);
       
-      // Refresh notes to show updated relationships
-      await loadNotes();
+      // Refresh current page to show updated relationships
+      await loadNotes(currentPage);
       clearSelection();
       
       // Show success message
@@ -114,7 +137,7 @@
     }
   }
   
-  // Reactive filtering
+  // Update reactive filtering to work with paginated data
   $: {
     filteredNotes = $notes.filter(note => {
       // Keyword search
@@ -146,7 +169,7 @@
   <title>Notes - PKMS</title>
 </svelte:head>
 
-<div class="space-y-6">
+<div class="space-y-6 pb-20"> <!-- Added bottom padding for pagination -->
   <!-- Selection Actions Bar -->
   {#if selectedNotes.size > 0}
     <div class="bg-yellow-600/20 border border-yellow-600 rounded-lg p-4">
@@ -232,11 +255,21 @@
     <div>
       <h1 class="text-3xl font-bold text-gray-200">Notes</h1>
       <p class="text-gray-400 mt-1">
-        {isLoading ? 'Loading...' : `${filteredNotes.length} notes found`}
+        {isLoading ? 'Loading...' : `${totalNotes} notes total, showing page ${currentPage} of ${totalPages}`}
       </p>
     </div>
     
     <div class="flex items-center space-x-3">
+      <!-- Sort dropdown -->
+      <select
+        bind:value={sortBy}
+        on:change={() => handleSortChange(sortBy)}
+        class="bg-gray-700 border border-gray-600 text-gray-300 px-3 py-2 rounded-md text-sm"
+      >
+        <option value="newest">Newest First</option>
+        <option value="oldest">Oldest First</option>
+      </select>
+      
       <button
         on:click={() => showFilters = !showFilters}
         class="btn-secondary flex items-center space-x-2"
@@ -257,7 +290,7 @@
     <div class="bg-red-600/20 border border-red-600 text-red-300 px-4 py-3 rounded-lg">
       <p>{error}</p>
       <button 
-        on:click={loadNotes} 
+        on:click={() => loadNotes(currentPage)} 
         class="text-red-200 underline hover:text-red-100 text-sm mt-1"
       >
         Try again
@@ -299,6 +332,19 @@
     {/if}
   {/if}
 </div>
+
+<!-- Pagination Component - Fixed at bottom -->
+{#if !isLoading && totalPages > 1}
+  <Pagination
+    {currentPage}
+    {totalPages}
+    {hasNext}
+    {hasPrev}
+    total={totalNotes}
+    itemsPerPage={20}
+    on:pageChange={handlePageChange}
+  />
+{/if}
 
 <style>
   .notes-masonry {

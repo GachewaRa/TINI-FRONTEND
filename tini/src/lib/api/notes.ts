@@ -5,12 +5,41 @@ const API_BASE = 'http://127.0.0.1:8000/api/v1';
 
 export class NotesAPI {
   // Get all notes
-  static async getNotes(): Promise<Note[]> {
-    const response = await fetch(`${API_BASE}/notes/`);
+  static async getNotes(page: number = 1, limit: number = 20, sortBy: string = 'newest'): Promise<{
+    notes: Note[];
+    total: number;
+    page: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  }> {
+    const skip = (page - 1) * limit;
+    const response = await fetch(`${API_BASE}/notes/?skip=${skip}&limit=${limit}&sort_by=${sortBy}`);
+    
     if (!response.ok) {
       throw new Error(`Failed to fetch notes: ${response.statusText}`);
     }
-    return response.json();
+    
+    const notes = await response.json();
+    
+    
+    // Get total count from headers or make a separate request
+    const totalHeader = response.headers.get('X-Total-Count');
+    
+    // Fallback: if no header, assume more pages if we got a full page
+    const total = totalHeader ? parseInt(totalHeader) : (notes.length === limit ? notes.length * 2 : notes.length);
+    
+    const totalPages = Math.ceil(total / limit);
+    
+    
+    return {
+      notes,
+      total,
+      page,
+      totalPages,
+      hasNext: page < totalPages,
+      hasPrev: page > 1
+    };
   }
 
   // Get single note with comments, tags, and matters
@@ -110,22 +139,4 @@ export class NotesAPI {
       throw new Error(`Failed to add note to matter: ${response.statusText}`);
     }
   }
-
-  // Get available projects (assuming this endpoint exists)
-  // static async getProjects(): Promise<Project[]> {
-  //   const response = await fetch(`${API_BASE}/projects/`);
-  //   if (!response.ok) {
-  //     throw new Error(`Failed to fetch projects: ${response.statusText}`);
-  //   }
-  //   return response.json();
-  // }
-
-  // Get available matters (assuming this endpoint exists)
-//   static async getMatters(): Promise<Matter[]> {
-//     const response = await fetch(`${API_BASE}/matters/`);
-//     if (!response.ok) {
-//       throw new Error(`Failed to fetch matters: ${response.statusText}`);
-//     }
-//     return response.json();
-//   }
 }

@@ -144,10 +144,10 @@
   <title>{highlight ? `Edit ${highlight.book_title}` : 'Edit Highlight'} - PKMS</title>
 </svelte:head>
 
-<div class="max-w-4xl mx-auto space-y-6">
+<div class="flex h-[calc(100vh-64px)] overflow-hidden flex-col">
   <!-- Loading State -->
   {#if isLoading}
-    <div class="flex items-center justify-center py-12">
+    <div class="flex-1 flex items-center justify-center">
       <div class="flex items-center space-x-3 text-gray-400">
         <Loader2 class="w-6 h-6 animate-spin" />
         <span>Loading highlight...</span>
@@ -156,159 +156,120 @@
   
   <!-- Load Error State -->
   {:else if loadError}
-    <div class="card p-6 text-center">
-      <AlertCircle class="w-12 h-12 text-red-500 mx-auto mb-4" />
-      <h3 class="text-lg font-medium text-gray-200 mb-2">Failed to load highlight</h3>
-      <p class="text-gray-400 mb-4">{loadError}</p>
-      <div class="flex items-center justify-center space-x-3">
-        <button
-          on:click={handleRetryLoad}
-          class="btn-primary"
-        >
-          Try Again
-        </button>
-        <button
-          on:click={() => goto('/highlights')}
-          class="px-4 py-2 text-gray-400 hover:text-gray-200 transition-colors"
-        >
-          Back to Highlights
-        </button>
+    <div class="flex-1 flex items-center justify-center p-6">
+      <div class="text-center">
+        <AlertCircle class="w-12 h-12 text-red-500 mx-auto mb-4" />
+        <h3 class="text-lg font-medium text-gray-200 mb-2">Failed to load highlight</h3>
+        <p class="text-gray-400 mb-4">{loadError}</p>
+        <div class="flex items-center justify-center space-x-3">
+          <button on:click={handleRetryLoad} class="btn-primary">Try Again</button>
+          <button
+            on:click={() => goto('/highlights')}
+            class="px-4 py-2 text-gray-400 hover:text-gray-200 transition-colors"
+          >
+            Back to Highlights
+          </button>
+        </div>
       </div>
     </div>
   
   <!-- Main Content -->
   {:else if highlight}
-    <!-- Header -->
-    <div class="flex items-center justify-between">
-      <div class="flex items-center space-x-4">
-        <button
-          on:click={handleCancel}
-          class="p-2 text-gray-400 hover:text-gray-200 transition-colors"
-          aria-label="Go back"
-          disabled={isSubmitting || isDeleting}
-        >
-          <ArrowLeft class="w-5 h-5" />
-        </button>
-        <div>
-          <h1 class="text-3xl font-bold text-gray-200">Edit Highlight</h1>
-          <p class="text-gray-400 mt-1">Update highlight information and content</p>
-        </div>
-      </div>
-      
-      <div class="flex items-center space-x-3">
-        <button
-          type="button"
-          on:click={() => showDeleteConfirm = true}
-          disabled={isSubmitting || isDeleting}
-          class="px-4 py-2 text-red-400 hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-        >
-          <Trash2 class="w-4 h-4" />
-          <span>Delete</span>
-        </button>
-        <button
-          type="button"
-          on:click={handleCancel}
-          disabled={isSubmitting || isDeleting}
-          class="px-4 py-2 text-gray-400 hover:text-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          on:click={handleSubmit}
-          disabled={isSubmitting || isDeleting}
-          class="btn-primary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Save class="w-4 h-4" />
-          <span>{isSubmitting ? 'Saving...' : 'Save Changes'}</span>
-        </button>
-      </div>
-    </div>
-    
-    <!-- Submit Error -->
-    {#if submitError}
-      <div class="card p-4 bg-red-900/20 border-red-500/30">
-        <div class="flex items-start space-x-3">
-          <AlertCircle class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-          <div class="flex-1">
-            <h4 class="text-sm font-medium text-red-400 mb-1">Error</h4>
-            <p class="text-sm text-red-300">{submitError}</p>
-          </div>
+    <!-- Fixed Header Bar -->
+    <div class="flex-shrink-0 bg-gray-900 border-b border-gray-700 px-6 py-3">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-3">
           <button
-            on:click={clearSubmitError}
-            class="text-red-400 hover:text-red-300 text-sm"
+            on:click={handleCancel}
+            class="p-1.5 text-gray-400 hover:text-gray-200 transition-colors"
+            aria-label="Go back"
+            disabled={isSubmitting || isDeleting}
           >
-            ×
+            <ArrowLeft class="w-4 h-4" />
+          </button>
+          
+          <div class="flex items-center space-x-4">
+            <!-- Book Title Input -->
+            <div class="flex-1 max-w-md">
+              <input
+                type="text"
+                bind:value={book_title}
+                placeholder="Book title..."
+                disabled={isSubmitting || isDeleting}
+                class="w-full px-3 py-1.5 bg-gray-800 border border-gray-700 rounded text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-yellow-600 focus:border-transparent text-sm"
+                class:border-red-500={errors.book_title}
+                on:input={clearSubmitError}
+              />
+            </div>
+            
+            <!-- Author Input -->
+            <div class="flex-1 max-w-xs">
+              <input
+                type="text"
+                bind:value={author}
+                placeholder="Author..."
+                disabled={isSubmitting || isDeleting}
+                class="w-full px-3 py-1.5 bg-gray-800 border border-gray-700 rounded text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-yellow-600 focus:border-transparent text-sm"
+                on:input={clearSubmitError}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+          <button
+            type="button"
+            on:click={() => showDeleteConfirm = true}
+            disabled={isSubmitting || isDeleting}
+            class="px-3 py-1.5 text-red-400 hover:text-red-300 transition-colors text-sm"
+          >
+            Delete
+          </button>
+          <button
+            type="button"
+            on:click={handleCancel}
+            disabled={isSubmitting || isDeleting}
+            class="px-3 py-1.5 text-gray-400 hover:text-gray-200 transition-colors text-sm"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            on:click={handleSubmit}
+            disabled={isSubmitting || isDeleting}
+            class="btn-primary flex items-center space-x-1.5 px-3 py-1.5 text-sm"
+          >
+            <Save class="w-3 h-3" />
+            <span>{isSubmitting ? 'Saving...' : 'Save'}</span>
           </button>
         </div>
       </div>
-    {/if}
-    
-    <!-- Form -->
-    <div class="card p-6 space-y-6">
-      <!-- Book Information -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label for="book_title" class="block text-sm font-medium text-gray-300 mb-2">
-            Book Title *
-          </label>
-          <input
-            id="book_title"
-            type="text"
-            bind:value={book_title}
-            placeholder="Enter book title"
-            disabled={isSubmitting || isDeleting}
-            class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-600 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-            class:border-red-500={errors.book_title}
-            on:input={clearSubmitError}
-          />
-          {#if errors.book_title}
-            <p class="mt-1 text-sm text-red-400">{errors.book_title}</p>
-          {/if}
+
+      <!-- Error display -->
+      {#if errors.book_title}
+        <p class="mt-1 text-xs text-red-400">{errors.book_title}</p>
+      {/if}
+      {#if submitError}
+        <div class="mt-2 bg-red-900/20 border border-red-700 rounded px-3 py-2">
+          <p class="text-red-400 text-xs">{submitError}</p>
         </div>
-        
-        <div>
-          <label for="author" class="block text-sm font-medium text-gray-300 mb-2">
-            Author
-          </label>
-          <input
-            id="author"
-            type="text"
-            bind:value={author}
-            placeholder="Enter author name"
-            disabled={isSubmitting || isDeleting}
-            class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-600 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-            on:input={clearSubmitError}
-          />
-        </div>
+      {/if}
+    </div>
+
+    <!-- Editor Section -->
+    <div class="flex-1 overflow-hidden p-4">
+      <div class="h-full" class:border-red-500={errors.content}>
+        <TinyMCEEditor
+          bind:content
+          placeholder="Enter your book highlights here..."
+          height="100%"
+          disabled={isSubmitting || isDeleting}
+          on:input={clearSubmitError}
+        />
       </div>
-      
-      <!-- Content Editor -->
-      <div>
-        <label class="block text-sm font-medium text-gray-300 mb-2">
-          Highlights Content *
-        </label>
-        <p class="text-sm text-gray-400 mb-4">
-          Update your highlights or excerpts from the book.
-        </p>
-        <div class="min-h-[400px]" class:border-red-500={errors.content}>
-          <TinyMCEEditor
-            bind:content
-            placeholder="Enter your book highlights here..."
-            height="400"
-            disabled={isSubmitting || isDeleting}
-            on:input={clearSubmitError}
-          />
-        </div>
-        {#if errors.content}
-          <p class="mt-1 text-sm text-red-400">{errors.content}</p>
-        {/if}
-      </div>
-      
-      <!-- Last Updated Info -->
-      <div class="text-sm text-gray-400 pt-4 border-t border-gray-700">
-        Last updated: {highlight.updated_at.toLocaleDateString()} at {highlight.updated_at.toLocaleTimeString()}
-      </div>
+      {#if errors.content}
+        <p class="mt-1 text-xs text-red-400">{errors.content}</p>
+      {/if}
     </div>
   {/if}
 </div>
