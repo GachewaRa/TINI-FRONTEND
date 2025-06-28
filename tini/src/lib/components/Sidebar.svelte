@@ -20,12 +20,7 @@
       icon: Home,
       active: true 
     },
-    { 
-      name: 'Documents', 
-      route: '/documents', 
-      icon: FileStack,
-      active: true 
-    },
+    
     { 
       name: 'Notes', 
       route: '/notes', 
@@ -54,7 +49,7 @@
       name: 'Matters', 
       route: '/matters', 
       icon: MessageSquare,
-      active: true 
+      active: false 
     },
     { 
       name: 'Threads', 

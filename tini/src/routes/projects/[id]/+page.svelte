@@ -14,6 +14,7 @@
   import { tagsStore } from '$lib/stores/tags';
   import { projectsStore } from '$lib/stores/projects';
   import { ProjectsAPI } from '$lib/api/projects';
+  import { Download } from 'lucide-svelte';
   import type { Project, ProjectFolder, Tag, Note } from '$lib/types';
 
   let projectId: string;
@@ -175,6 +176,136 @@
     }
   }
 
+  // Add this helper function at the top of your file
+  function decodeHtmlEntities(text) {
+    const textArea = document.createElement('textarea');
+    textArea.innerHTML = text;
+    return textArea.value;
+  }
+
+  async function handleExportPDF() {
+    if (!project) return;
+
+    try {
+      const { jsPDF } = await import('jspdf');
+      
+      const doc = new jsPDF();
+      
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 20;
+      const maxWidth = pageWidth - (margin * 2);
+      let yPos = margin;
+
+      // Project title (with text wrapping)
+      doc.setFontSize(18);
+      const titleLines = doc.splitTextToSize(project.title, maxWidth);
+      doc.text(titleLines, margin, yPos);
+      yPos += titleLines.length * 7 + 10; // Adjust spacing based on title lines
+
+      // Tags only (if any)
+      if (selectedTags.length > 0) {
+        doc.setFontSize(10);
+        const tagsText = `Tags: ${selectedTags.map(t => t.name).join(', ')}`;
+        const tagLines = doc.splitTextToSize(tagsText, maxWidth);
+        doc.text(tagLines, margin, yPos);
+        yPos += tagLines.length * 4 + 10;
+      }
+
+      // Project content (with pagination)
+      doc.setFontSize(12);
+      // const cleanContent = content.replace(/<[^>]*>/g, '').trim();
+      const cleanContent = decodeHtmlEntities(content.replace(/<[^>]*>/g, '').trim());
+      if (cleanContent) {
+        const contentLines = doc.splitTextToSize(cleanContent, maxWidth);
+        
+        for (let i = 0; i < contentLines.length; i++) {
+          // Check if we need a new page
+          if (yPos > pageHeight - 30) {
+            doc.addPage();
+            yPos = margin;
+          }
+          
+          doc.text(contentLines[i], margin, yPos);
+          yPos += 5; // Line spacing
+        }
+        
+        yPos += 10; // Extra space after content
+      }
+
+      // Related notes (with pagination)
+      if (relatedNotes.length > 0) {
+        // Check if we need a new page for notes section
+        if (yPos > pageHeight - 50) {
+          doc.addPage();
+          yPos = margin;
+        }
+        
+        doc.setFontSize(14);
+        doc.text('Related Notes:', margin, yPos);
+        yPos += 10;
+        
+        relatedNotes.forEach((note, index) => {
+          // Check if we need a new page for this note
+          if (yPos > pageHeight - 40) {
+            doc.addPage();
+            yPos = margin;
+          }
+          
+          // Note title
+          doc.setFontSize(12);
+          doc.setFont(undefined, 'bold');
+          const noteTitleLines = doc.splitTextToSize(note.title, maxWidth);
+          doc.text(noteTitleLines, margin, yPos);
+          yPos += noteTitleLines.length * 5 + 3;
+          
+          // Note source
+          doc.setFont(undefined, 'normal');
+          doc.setFontSize(9);
+          doc.text(`Source: ${note.source}`, margin, yPos);
+          yPos += 8;
+          
+          // Note content
+          doc.setFontSize(10);
+          const noteContent = note.content.replace(/<[^>]*>/g, '').trim();
+          const noteLines = doc.splitTextToSize(noteContent, maxWidth);
+          
+          for (let i = 0; i < noteLines.length; i++) {
+            // Check if we need a new page
+            if (yPos > pageHeight - 20) {
+              doc.addPage();
+              yPos = margin;
+            }
+            
+            doc.text(noteLines[i], margin, yPos);
+            yPos += 4; // Tighter line spacing for note content
+          }
+          
+          // Add space between notes
+          yPos += 8;
+          
+          // Add separator line if not the last note
+          if (index < relatedNotes.length - 1) {
+            if (yPos > pageHeight - 25) {
+              doc.addPage();
+              yPos = margin;
+            }
+            doc.line(margin, yPos, pageWidth - margin, yPos);
+            yPos += 8;
+          }
+        });
+      }
+      
+      // Download with sanitized filename
+      const filename = project.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      doc.save(`${filename}.pdf`);
+      
+    } catch (error) {
+      console.error('Export failed:', error);
+      errors.submit = 'Failed to export PDF';
+    }
+  }
+
   async function handleHideNote(noteId: string) {
     if (!project) return;
     
@@ -275,7 +406,7 @@ ${notesContent}`;
     await navigator.clipboard.writeText(finalContent);
     
     // Optional: Show a brief success indicator
-    console.log('Notes copied to clipboard!');
+    // console.log('Notes copied to clipboard!');
     
   } catch (error) {
     console.error('Failed to copy to clipboard:', error);
@@ -365,6 +496,17 @@ function fallbackCopyToClipboard(text) {
           aria-label="Toggle settings"
         >
           <Settings class="w-4 h-4" />
+        </button>
+
+        <!-- Add this between the Settings button and Delete button -->
+        <button
+          type="button"
+          on:click={handleExportPDF}
+          disabled={isSubmitting || !project}
+          class="p-1.5 text-gray-400 hover:text-gray-200 transition-colors"
+          title="Export as PDF"
+        >
+          <Download class="w-4 h-4" />
         </button>
         
         {#if project}
